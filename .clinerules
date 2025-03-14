@@ -1,0 +1,101 @@
+# Barreiros ThreeAI Project
+
+## Project Overview
+
+This project is a full-stack application that demonstrates the integration of Three.js for 3D rendering with real-time WebSocket communication between a frontend and backend. The application allows users to interact with a 3D scene while exchanging messages with a server in real-time.
+
+## Technology Stack
+
+### Frontend
+
+- **ViteJS**: Fast, modern frontend build tool and development server
+- **Three.js**: JavaScript 3D library for creating and displaying animated 3D computer graphics
+- **WebSocket Client**: Native WebSocket API for real-time communication with the backend
+- **Vanilla JavaScript**: No additional frontend frameworks, using pure JavaScript
+
+### Backend
+
+- **Node.js**: JavaScript runtime for server-side code
+- **Express.js**: Web application framework for Node.js
+- **WebSocket Server**: Using the 'ws' library for WebSocket functionality
+
+## Project Structure
+
+```
+/
+├── package.json         # Project configuration and dependencies
+├── vite.config.js       # ViteJS configuration
+├── .clientrules         # This file - project documentation
+├── src/
+│   ├── frontend/        # Frontend code
+│   │   ├── index.html   # Main HTML file
+│   │   ├── style.css    # CSS styles
+│   │   └── main.js      # JavaScript with Three.js and WebSocket client
+│   └── backend/         # Backend code
+│       └── server.js    # Express server with WebSocket support
+```
+
+## Development Setup
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm (v6 or higher)
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+```
+
+### Running the Application
+
+```bash
+# Start both frontend and backend servers
+npm run dev
+```
+
+This will start:
+
+- Frontend server at http://localhost:3000
+- Backend server at http://localhost:3001
+- WebSocket server at ws://localhost:3001
+
+## Features
+
+1. **3D Visualization**: Interactive 3D scene using Three.js
+2. **Real-time Communication**: WebSocket connection between frontend and backend
+3. **Message Exchange**: Send and receive messages that affect the 3D scene
+4. **Responsive Design**: Adapts to different screen sizes
+
+## Implementation Details
+
+### WebSocket Communication
+
+The WebSocket connection enables real-time bidirectional communication between the client and server. Messages sent from the client are echoed back by the server, and the 3D scene reacts to these messages by animating the cube.
+
+### Three.js Scene
+
+The 3D scene features a rotating cube that changes color and scale based on the messages exchanged through the WebSocket connection. The scene includes:
+
+- Perspective camera
+- Ambient and directional lighting
+- Orbit controls for user interaction
+- Responsive resizing
+
+## Extending the Project
+
+This project serves as a foundation that can be extended in various ways:
+
+1. **Enhanced 3D Visualization**: Add more complex 3D models and animations
+2. **Multi-user Interaction**: Implement user authentication and multi-user capabilities
+3. **Data Persistence**: Add a database to store messages and user interactions
+4. **Advanced Controls**: Implement more sophisticated controls for the 3D scene
+5. **Additional Features**: Add features like file sharing, voice chat, or video streaming
+
+## Troubleshooting
+
+- If the WebSocket connection fails, check that both servers are running
+- If 3D rendering issues occur, verify WebGL support in your browser
+- For CORS issues, check the proxy settings in vite.config.js
