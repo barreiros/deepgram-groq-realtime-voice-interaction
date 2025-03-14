@@ -104,28 +104,6 @@ wss.on('connection', (ws) => {
       if (data.setup) {
         console.log('Initializing Gemini connection with config:', data.setup)
 
-        // Ensure setup has proper audio configuration
-        if (data.setup.generationConfig) {
-          // Make sure responseModalities is an array
-          if (
-            typeof data.setup.generationConfig.responseModalities === 'string'
-          ) {
-            data.setup.generationConfig.responseModalities = [
-              data.setup.generationConfig.responseModalities,
-            ]
-          }
-
-          // Ensure both text and audio are included
-          if (!data.setup.generationConfig.responseModalities) {
-            data.setup.generationConfig.responseModalities = ['text', 'audio']
-          } else if (
-            !data.setup.generationConfig.responseModalities.includes('text') ||
-            !data.setup.generationConfig.responseModalities.includes('audio')
-          ) {
-            data.setup.generationConfig.responseModalities = ['text', 'audio']
-          }
-        }
-
         geminiWs = createGeminiWebSocket(ws)
 
         // Store setup message to send once connection is established
