@@ -64,7 +64,8 @@ const createGeminiWebSocket = (clientWs) => {
 
       // Create a Blob from the message
       const blob = Buffer.from(message)
-      clientWs.send(blob, { binary: true })
+      // clientWs.send(blob, { binary: true })
+      clientWs.send(message)
     } catch (error) {
       console.error('Error handling Gemini message:', error)
     }
@@ -117,38 +118,11 @@ wss.on('connection', (ws) => {
       }
 
       // Handle audio data from client
-      if (data.audio) {
-        console.log('Received audio data from client')
-
-        // Process audio data
-        const audioMessage = {
-          contents: [
-            {
-              parts: [
-                {
-                  audio: {
-                    data: data.audio.data,
-                    mime_type: 'audio/x-linear16',
-                    sample_rate_hertz: data.audio.sampleRate || 16000,
-                  },
-                },
-              ],
-            },
-          ],
-        }
-
+      if (data?.realtimeInput?.mediaChunks) {
         // Forward to Gemini if connection exists
         if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
           console.log('Forwarding audio to Gemini')
-          geminiWs.send(JSON.stringify(audioMessage))
-
-          // Send acknowledgment to client
-          ws.send(
-            JSON.stringify({
-              type: 'audio_status',
-              message: 'Audio data sent to Gemini',
-            })
-          )
+          geminiWs.send(JSON.stringify(data))
         } else {
           console.error('Cannot send audio: No Gemini connection')
           ws.send(

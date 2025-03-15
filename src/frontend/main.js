@@ -102,8 +102,9 @@ function initWebSocket() {
         // Handle binary message from Gemini
         event.data.text().then((text) => {
           try {
+            console.log('Gemini RAW response:', text)
             const geminiData = JSON.parse(text)
-            console.log('Gemini response:', geminiData)
+            // console.log('Gemini response:', geminiData)
 
             // Process Gemini response
             processGeminiResponse(geminiData)
@@ -253,10 +254,13 @@ function sendAudioData(audioData) {
   try {
     // Create audio message for Gemini
     const audioMessage = {
-      audio: {
-        data: audioData,
-        sampleRate: 16000,
-        encoding: 'LINEAR16',
+      realtimeInput: {
+        mediaChunks: [
+          {
+            mimeType: 'audio/pcm;rate=16000',
+            data: audioData,
+          },
+        ],
       },
     }
 
@@ -326,46 +330,34 @@ function initGeminiConnection() {
         ],
       },
       tools: [
+        // there is a free-tier quota for search
+        { googleSearch: {} },
         {
           functionDeclarations: [
             {
-              name: 'confetti',
-              description:
-                'Execute a confetti action when user is asking for it',
+              name: 'get_circles',
+              description: 'Get a list of circles in my application',
             },
             {
-              name: 'stream_tool',
-              description:
-                'Enable and stream tool when user is asking for it: transform, delete, translate, rotate, scale, duplicate, animation, message, primaryColor, secondaryColor',
-            },
-            {
-              name: 'stream_action',
-              description:
-                'Execute an stream action when user is asking for it: changePosition, changeRotation, changeScale, duplicateNode, deleteNode, changePrimaryColor, changeSecondaryColor',
+              name: 'change_circle',
+              description: 'Change one of the circles',
               parameters: {
                 type: 'OBJECT',
                 properties: {
-                  action: {
+                  color: {
                     type: 'STRING',
-                    description:
-                      'The name of the action to perform (e.g., changePosition, changeRotation, changeScale, duplicateNode, deleteNode, changePrimaryColor, changeSecondaryColor)',
-                    enum: [
-                      'changePosition',
-                      'changeRotation',
-                      'changeScale',
-                      'duplicateNode',
-                      'deleteNode',
-                      'changePrimaryColor',
-                      'changeSecondaryColor',
-                    ],
                   },
-                  payload: {
-                    type: 'STRING',
-                    description:
-                      'A JSON object structured according to the specific action being performed',
+                  x: {
+                    type: 'NUMBER',
+                  },
+                  y: {
+                    type: 'NUMBER',
+                  },
+                  radius: {
+                    type: 'NUMBER',
                   },
                 },
-                required: ['action', 'payload'],
+                required: ['color', 'x', 'y', 'radius'],
               },
             },
           ],
@@ -384,7 +376,32 @@ function initGeminiConnection() {
 function processGeminiResponse(response) {
   if (!response) return
 
-  // Check if response has candidates
+  // Check for the new Gemini audio format
+  if (
+    response.serverContent &&
+    response.modelTurn &&
+    response.modelTurn.parts
+  ) {
+    // Process the new format with inlineData
+    response.modelTurn.parts.forEach((part) => {
+      if (part.inlineData) {
+        addMessage('Gemini', '🔊 Audio response received', 'received')
+
+        // Play the audio data with the specified mime type
+        playAudioResponse(part.inlineData.data, part.inlineData.mimeType)
+
+        // Animate the cube based on audio response
+        animateCubeOnAudio()
+      } else {
+        console.log('unhandled part', part)
+      }
+    })
+    return
+  } else {
+    console.log('unhandled response', response)
+  }
+
+  // Handle the original format
   if (response.candidates && response.candidates.length > 0) {
     const candidate = response.candidates[0]
 
@@ -551,7 +568,7 @@ function onWindowResize() {
 }
 
 // Play audio response from Gemini
-function playAudioResponse(audioData) {
+function playAudioResponse(audioData, mimeType = 'audio/wav') {
   try {
     // Create audio element
     const audioElement = document.createElement('audio')
@@ -565,11 +582,25 @@ function playAudioResponse(audioData) {
       byteNumbers[i] = byteCharacters.charCodeAt(i)
     }
     const byteArray = new Uint8Array(byteNumbers)
-    const audioBlob = new Blob([byteArray], { type: 'audio/wav' })
 
-    // Create object URL and set as source
-    const audioUrl = URL.createObjectURL(audioBlob)
-    audioElement.src = audioUrl
+    // Handle PCM audio data (convert to WAV)
+    if (mimeType.includes('audio/pcm')) {
+      // Extract sample rate from mime type
+      const sampleRateMatch = mimeType.match(/rate=(\d+)/)
+      const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1]) : 24000
+
+      // Convert PCM to WAV
+      const wavBlob = pcmToWav(byteArray, sampleRate)
+      const audioUrl = URL.createObjectURL(wavBlob)
+      audioElement.src = audioUrl
+
+      console.log(`Playing PCM audio with sample rate: ${sampleRate}Hz`)
+    } else {
+      // Handle other audio formats directly
+      const audioBlob = new Blob([byteArray], { type: mimeType })
+      const audioUrl = URL.createObjectURL(audioBlob)
+      audioElement.src = audioUrl
+    }
 
     // Add to document temporarily (needed for some browsers)
     audioElement.style.display = 'none'
@@ -577,7 +608,7 @@ function playAudioResponse(audioData) {
 
     // Clean up after playing
     audioElement.onended = () => {
-      URL.revokeObjectURL(audioUrl)
+      URL.revokeObjectURL(audioElement.src)
       document.body.removeChild(audioElement)
       audioStatus.textContent = 'Audio playback complete'
     }
@@ -589,12 +620,62 @@ function playAudioResponse(audioData) {
     audioElement.onerror = (error) => {
       console.error('Audio playback error:', error)
       audioStatus.textContent = 'Error playing audio'
-      URL.revokeObjectURL(audioUrl)
+      URL.revokeObjectURL(audioElement.src)
       document.body.removeChild(audioElement)
     }
   } catch (error) {
     console.error('Error processing audio data:', error)
     audioStatus.textContent = 'Error processing audio'
+  }
+}
+
+// Convert PCM data to WAV format
+function pcmToWav(pcmData, sampleRate) {
+  // WAV header parameters
+  const numChannels = 1 // Mono
+  const bitsPerSample = 16 // 16-bit audio
+  const bytesPerSample = bitsPerSample / 8
+  const blockAlign = numChannels * bytesPerSample
+  const byteRate = sampleRate * blockAlign
+  const dataSize = pcmData.length
+  const headerSize = 44
+  const wavSize = headerSize + dataSize
+
+  // Create WAV header
+  const wavHeader = new ArrayBuffer(headerSize)
+  const view = new DataView(wavHeader)
+
+  // "RIFF" chunk descriptor
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, wavSize - 8, true) // File size - 8
+  writeString(view, 8, 'WAVE')
+
+  // "fmt " sub-chunk
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true) // Subchunk1Size (16 for PCM)
+  view.setUint16(20, 1, true) // AudioFormat (1 for PCM)
+  view.setUint16(22, numChannels, true) // NumChannels
+  view.setUint32(24, sampleRate, true) // SampleRate
+  view.setUint32(28, byteRate, true) // ByteRate
+  view.setUint16(32, blockAlign, true) // BlockAlign
+  view.setUint16(34, bitsPerSample, true) // BitsPerSample
+
+  // "data" sub-chunk
+  writeString(view, 36, 'data')
+  view.setUint32(40, dataSize, true) // Subchunk2Size
+
+  // Create the WAV file by combining the header and PCM data
+  const wavFile = new Uint8Array(wavSize)
+  wavFile.set(new Uint8Array(wavHeader), 0)
+  wavFile.set(pcmData, headerSize)
+
+  return new Blob([wavFile], { type: 'audio/wav' })
+}
+
+// Helper function to write strings to DataView
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i))
   }
 }
 
