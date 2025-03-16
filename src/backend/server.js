@@ -153,7 +153,16 @@ const createGeminiWebSocket = (clientWs) => {
 // WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket')
-  let geminiWs = null
+
+  // Initialize Gemini connection immediately
+  const geminiWs = createGeminiWebSocket(ws)
+
+  // Send setup config once Gemini connection is established
+  if (geminiWs.readyState !== WebSocket.OPEN) {
+    geminiWs.pendingSetup = setupConfig
+  } else {
+    geminiWs.send(JSON.stringify(setupConfig))
+  }
 
   // Send a welcome message to the client
   ws.send(
@@ -168,20 +177,6 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message)
       console.log('Received from client:', data)
-
-      // Initialize Gemini connection on first message
-      if (!geminiWs) {
-        console.log('Initializing Gemini connection')
-        geminiWs = createGeminiWebSocket(ws)
-
-        // Store setup message to send once connection is established
-        if (geminiWs.readyState !== WebSocket.OPEN) {
-          geminiWs.pendingSetup = setupConfig
-        } else {
-          console.log('Sending setup message to Gemini')
-          geminiWs.send(JSON.stringify(setupConfig))
-        }
-      }
 
       // Handle audio data from client
       if (data?.realtimeInput?.mediaChunks) {
@@ -234,6 +229,8 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket')
     if (geminiWs) {
+      console.log('Closing Gemini connection')
+      geminiWs.removeAllListeners()
       geminiWs.close()
     }
   })
