@@ -117,6 +117,9 @@ export class GeminiService {
     try {
       const data = JSON.parse(message)
       console.log('Received from client:', data)
+      if (data?.realtimeInput?.mediaChunks) {
+        console.log('Received audio data from client')
+      }
 
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         console.log('Forwarding to Gemini:', JSON.stringify(data))

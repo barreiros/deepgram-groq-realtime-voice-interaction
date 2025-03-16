@@ -7,8 +7,12 @@ class GeminiWebSocketService extends BaseWebSocketService {
   }
 
   sendAudioData(data) {
+    console.log('GeminiWebSocketService received audio data:', data)
     if (data?.realtimeInput?.mediaChunks) {
+      console.log('Sending audio data to WebSocket')
       this.sendMessage(data)
+    } else {
+      console.error('Invalid audio data format:', data)
     }
   }
 

@@ -56,7 +56,7 @@ export default function App() {
     }
 
     if (!audioService.current) {
-      audioService.current = new AudioRecordingService(ws.current.socket)
+      audioService.current = new AudioRecordingService(ws.current)
       audioService.current.onVolumeChange = (volume) => {
         const scaledVolume = Math.min(100, Math.floor(volume * 100))
         if (scaledVolume > 5) {

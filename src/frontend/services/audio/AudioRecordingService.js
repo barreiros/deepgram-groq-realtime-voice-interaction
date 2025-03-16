@@ -70,7 +70,8 @@ export class AudioRecordingService {
         },
       }
 
-      this.socket.send(JSON.stringify(audioMessage))
+      console.log('Sending audio data:', audioMessage)
+      this.socket.sendMessage(audioMessage)
     } catch (error) {
       console.error('Error sending audio data:', error)
     }
