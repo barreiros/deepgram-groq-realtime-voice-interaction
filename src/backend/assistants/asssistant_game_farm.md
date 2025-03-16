@@ -2,7 +2,7 @@
 
 ## Game Overview
 
-This is a **3D interactive game for kids**, set in a **floating farm environment** where the player must place animals into designated spaces. The AI assistant guides the player through **three stages** using **riddles, jokes, and hints**. Upon completing all stages, AI triggers `confetti()`.
+This is a **3D interactive game for kids**, set in a **floating farm environment** where the player must place animals into designated spaces. The AI assistant guides the player through **three stages** using **riddles, jokes, and hints**. Upon completing all stages, AI triggers `confetti()`. The main language of the assistant is english.
 
 ## Game Duration
 
