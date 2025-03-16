@@ -62,31 +62,82 @@ const Scene = React.forwardRef((props, ref) => {
       controls.enableDamping = true
       controlsRef.current = controls
 
-      // Add ground
-      const groundGeometry = new THREE.PlaneGeometry(10, 10)
-      const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 })
-      const ground = new THREE.Mesh(groundGeometry, groundMaterial)
-      ground.rotation.x = -Math.PI / 2
-      ground.position.y = -2
-      scene.add(ground)
+      // Create room
+      const roomSize = 10
+      const wallThickness = 0.5
+      const walls = [
+        // Ground
+        {
+          size: [roomSize, wallThickness, roomSize],
+          position: [0, -2, 0],
+          rotation: [0, 0, 0],
+        },
+        // Ceiling
+        {
+          size: [roomSize, wallThickness, roomSize],
+          position: [0, 8, 0],
+          rotation: [0, 0, 0],
+        },
+        // Back wall
+        {
+          size: [roomSize, 10, wallThickness],
+          position: [0, 3, -roomSize / 2],
+          rotation: [0, 0, 0],
+        },
+        // Front wall
+        {
+          size: [roomSize, 10, wallThickness],
+          position: [0, 3, roomSize / 2],
+          rotation: [0, 0, 0],
+        },
+        // Left wall
+        {
+          size: [wallThickness, 10, roomSize],
+          position: [-roomSize / 2, 3, 0],
+          rotation: [0, 0, 0],
+        },
+        // Right wall
+        {
+          size: [wallThickness, 10, roomSize],
+          position: [roomSize / 2, 3, 0],
+          rotation: [0, 0, 0],
+        },
+      ]
 
-      // Add ground physics
-      const groundShape = new Ammo.btBoxShape(new Ammo.btVector3(5, 0.1, 5))
-      groundShape.setMargin(0.05)
-      const groundTransform = new Ammo.btTransform()
-      groundTransform.setIdentity()
-      groundTransform.setOrigin(new Ammo.btVector3(0, -2, 0))
-      const groundMass = 0
-      const groundLocalInertia = new Ammo.btVector3(0, 0, 0)
-      const groundMotionState = new Ammo.btDefaultMotionState(groundTransform)
-      const groundRbInfo = new Ammo.btRigidBodyConstructionInfo(
-        groundMass,
-        groundMotionState,
-        groundShape,
-        groundLocalInertia
-      )
-      const groundBody = new Ammo.btRigidBody(groundRbInfo)
-      physicsWorld.addRigidBody(groundBody)
+      walls.forEach((wall) => {
+        const geometry = new THREE.BoxGeometry(...wall.size)
+        const material = new THREE.MeshPhongMaterial({
+          color: 0x808080,
+          transparent: true,
+          opacity: 0.2,
+        })
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.position.set(...wall.position)
+        mesh.rotation.set(...wall.rotation)
+        scene.add(mesh)
+
+        const shape = new Ammo.btBoxShape(
+          new Ammo.btVector3(
+            wall.size[0] / 2,
+            wall.size[1] / 2,
+            wall.size[2] / 2
+          )
+        )
+        shape.setMargin(0.05)
+        const transform = new Ammo.btTransform()
+        transform.setIdentity()
+        transform.setOrigin(new Ammo.btVector3(...wall.position))
+        const motionState = new Ammo.btDefaultMotionState(transform)
+        const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+          0,
+          motionState,
+          shape,
+          new Ammo.btVector3(0, 0, 0)
+        )
+        const body = new Ammo.btRigidBody(rbInfo)
+        body.setRestitution(1.0)
+        physicsWorld.addRigidBody(body)
+      })
 
       const handleClick = (event) => {
         const rect = renderer.domElement.getBoundingClientRect()
@@ -129,30 +180,14 @@ const Scene = React.forwardRef((props, ref) => {
         if (physicsWorldRef.current) {
           physicsWorldRef.current.stepSimulation(1 / 60, 10)
 
-          rigidBodiesRef.current.forEach((body, index) => {
-            if (body.isOrbiting) {
-              const time = Date.now() * 0.001 * orbitSpeedRef.current
-              const angle =
-                time + (index * Math.PI * 2) / rigidBodiesRef.current.length
-              const x = Math.cos(angle) * orbitRadiusRef.current
-              const z = Math.sin(angle) * orbitRadiusRef.current
-              const y = Math.sin(time) * 0.5 + 2
-
-              const transform = new Ammo.btTransform()
-              transform.setIdentity()
-              transform.setOrigin(new Ammo.btVector3(x, y, z))
-              body.motionState.setWorldTransform(transform)
-              body.mesh.position.set(x, y, z)
-              body.mesh.rotation.y = -angle
-            } else {
-              const ms = body.motionState
-              if (ms) {
-                ms.getWorldTransform(transformAuxRef.current)
-                const p = transformAuxRef.current.getOrigin()
-                const q = transformAuxRef.current.getRotation()
-                body.mesh.position.set(p.x(), p.y(), p.z())
-                body.mesh.quaternion.set(q.x(), q.y(), q.z(), q.w())
-              }
+          rigidBodiesRef.current.forEach((body) => {
+            const ms = body.motionState
+            if (ms) {
+              ms.getWorldTransform(transformAuxRef.current)
+              const p = transformAuxRef.current.getOrigin()
+              const q = transformAuxRef.current.getRotation()
+              body.mesh.position.set(p.x(), p.y(), p.z())
+              body.mesh.quaternion.set(q.x(), q.y(), q.z(), q.w())
             }
           })
         }
@@ -248,7 +283,21 @@ const Scene = React.forwardRef((props, ref) => {
       body.setRollingFriction(0.1)
       body.setRestitution(0.7)
       body.setDamping(0.1, 0.1)
-      body.isOrbiting = true
+      // Apply initial random velocity
+      const velocity = new Ammo.btVector3(
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10
+      )
+      body.setLinearVelocity(velocity)
+      body.setAngularVelocity(
+        new Ammo.btVector3(
+          Math.random() - 0.5,
+          Math.random() - 0.5,
+          Math.random() - 0.5
+        )
+      )
+      body.setRestitution(1.0)
 
       physicsWorldRef.current.addRigidBody(body)
       body.mesh = mesh
