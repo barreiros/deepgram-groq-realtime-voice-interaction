@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useImperativeHandle } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 
-export default function Scene() {
+const Scene = React.forwardRef((props, ref) => {
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
   const cameraRef = useRef(null)
@@ -37,39 +37,6 @@ export default function Scene() {
     controls.enableDamping = true
     controlsRef.current = controls
 
-    const addRandomPrimitive = () => {
-      const primitives = [
-        () => new THREE.BoxGeometry(1, 1, 1),
-        () => new THREE.SphereGeometry(0.5, 32, 32),
-        () => new THREE.ConeGeometry(0.5, 1, 32),
-        () => new THREE.TorusGeometry(0.5, 0.2, 16, 100),
-      ]
-
-      const randomGeometry =
-        primitives[Math.floor(Math.random() * primitives.length)]()
-      const material = new THREE.MeshPhongMaterial({
-        color: Math.random() * 0xffffff,
-        shininess: 100,
-      })
-      const mesh = new THREE.Mesh(randomGeometry, material)
-
-      mesh.position.set(
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 10
-      )
-
-      mesh.rotation.set(
-        Math.random() * Math.PI * 2,
-        Math.random() * Math.PI * 2,
-        Math.random() * Math.PI * 2
-      )
-
-      scene.add(mesh)
-    }
-
-    window.addRandomPrimitive = addRandomPrimitive
-
     const animate = () => {
       requestAnimationFrame(animate)
       controls.update()
@@ -94,5 +61,39 @@ export default function Scene() {
     }
   }, [])
 
+  useImperativeHandle(ref, () => ({
+    addPrimitive: (type) => {
+      let geometry
+      switch (type) {
+        case 'cube':
+          geometry = new THREE.BoxGeometry(1, 1, 1)
+          break
+        case 'sphere':
+          geometry = new THREE.SphereGeometry(0.5, 32, 32)
+          break
+        case 'cone':
+          geometry = new THREE.ConeGeometry(0.5, 1, 32)
+          break
+        case 'torus':
+          geometry = new THREE.TorusGeometry(0.5, 0.2, 16, 100)
+          break
+        default:
+          geometry = new THREE.BoxGeometry(1, 1, 1)
+      }
+
+      const material = new THREE.MeshPhongMaterial({
+        color: Math.random() * 0xffffff,
+        shininess: 100,
+      })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.position.set(0, 0, 0)
+      if (sceneRef.current) {
+        sceneRef.current.add(mesh)
+      }
+    },
+  }))
+
   return <div ref={mountRef} style={{ width: '100%', height: '100vh' }} />
-}
+})
+
+export default Scene

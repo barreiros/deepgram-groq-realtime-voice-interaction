@@ -12,6 +12,7 @@ export default function App() {
   const ws = useRef(null)
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
+  const sceneRef = useRef(null)
 
   useEffect(() => {
     if (!ws.current) {
@@ -32,7 +33,7 @@ export default function App() {
   const handleWebSocketMessage = (data) => {
     try {
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-      console.log('Received WebSocket message:', parsedData)
+      // console.log('Received WebSocket message:', parsedData)
       setMessages((prev) => [...prev, { type: 'received', text: parsedData }])
 
       if (parsedData.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -41,8 +42,8 @@ export default function App() {
       }
 
       // Handle stream actions
-      if (parsedData.toolCall?.functionCalls[0]) {
-        const functionCall = parsedData.toolCall.functionCalls[0]
+      if (parsedData?.toolCall?.functionCalls[0]) {
+        const functionCall = parsedData?.toolCall?.functionCalls[0]
         if (functionCall.name === 'stream_action') {
           try {
             const { action, payload } = functionCall.args
@@ -51,7 +52,9 @@ export default function App() {
 
             switch (action) {
               case 'addNode':
-                window.addRandomPrimitive()
+                if (sceneRef.current?.addPrimitive) {
+                  sceneRef.current.addPrimitive(parsedPayload.type || 'cube')
+                }
                 break
               // Add other action cases here
             }
@@ -143,7 +146,7 @@ export default function App() {
 
   return (
     <div>
-      <Scene />
+      <Scene ref={sceneRef} />
       <div className="chat-container">
         <div className="messages">
           {messages.map((msg, index) => (
