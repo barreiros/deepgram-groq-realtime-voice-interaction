@@ -5,6 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import dotenv from 'dotenv'
+import fs from 'fs'
 
 // Load environment variables from .env file
 dotenv.config()
@@ -12,6 +13,73 @@ dotenv.config()
 // Get directory name in ESM
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+
+// Setup configuration
+const setupConfig = {
+  setup: {
+    model: 'models/gemini-2.0-flash-exp',
+    generationConfig: {
+      responseModalities: 'audio',
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } },
+      },
+    },
+    tools: [
+      {
+        functionDeclarations: [
+          {
+            name: 'confetti',
+            description: 'Execute a confetti action when user is asking for it',
+          },
+          {
+            name: 'stream_tool',
+            description:
+              'Enable and stream tool when user is asking for it: transform, delete, translate, rotate, scale, duplicate, animation, message, primaryColor, secondaryColor',
+          },
+          {
+            name: 'stream_action',
+            description:
+              'Execute an stream action when user is asking for it: changePosition, changeRotation, changeScale, duplicateNode, deleteNode, changePrimaryColor, changeSecondaryColor',
+            parameters: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  description: 'The name of the action to perform',
+                  enum: [
+                    'changePosition',
+                    'changeRotation',
+                    'changeScale',
+                    'duplicateNode',
+                    'deleteNode',
+                    'changePrimaryColor',
+                    'changeSecondaryColor',
+                  ],
+                },
+                payload: {
+                  type: 'string',
+                  description:
+                    'A JSON object structured according to the specific action being performed',
+                },
+              },
+              required: ['action', 'payload'],
+            },
+          },
+        ],
+      },
+    ],
+    systemInstruction: {
+      parts: [
+        {
+          text: fs.readFileSync(
+            path.join(__dirname, 'assistants/assistant.md'),
+            'utf8'
+          ),
+        },
+      ],
+    },
+  },
+}
 
 // Create Express application
 const app = express()
@@ -101,20 +169,18 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(message)
       console.log('Received from client:', data)
 
-      // Initialize Gemini connection when receiving setup message
-      if (data.setup) {
-        console.log('Initializing Gemini connection with config:', data.setup)
-
+      // Initialize Gemini connection on first message
+      if (!geminiWs) {
+        console.log('Initializing Gemini connection')
         geminiWs = createGeminiWebSocket(ws)
 
         // Store setup message to send once connection is established
         if (geminiWs.readyState !== WebSocket.OPEN) {
-          geminiWs.pendingSetup = data
+          geminiWs.pendingSetup = setupConfig
         } else {
-          console.log('Sending setup message to Gemini:', data.setup)
-          geminiWs.send(JSON.stringify(data.setup))
+          console.log('Sending setup message to Gemini')
+          geminiWs.send(JSON.stringify(setupConfig))
         }
-        return
       }
 
       // Handle audio data from client
