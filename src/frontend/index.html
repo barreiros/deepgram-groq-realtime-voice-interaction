@@ -1,45 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Three.js WebSocket Application</title>
-  <link rel="stylesheet" href="./style.css">
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1>Three.js WebSocket Application</h1>
-    </header>
-
-    <main>
-      <div id="scene-container"></div>
-
-      <div class="controls">
-        <h2>WebSocket Communication</h2>
-        <div class="message-input">
-          <input type="text" id="message-input" placeholder="Type a message...">
-          <button id="send-button">Send</button>
-        </div>
-        <div class="audio-controls">
-          <button id="record-button" class="record-button">
-            <span class="record-icon"></span>
-            Record Audio
-          </button>
-          <div id="audio-status" class="audio-status"></div>
-        </div>
-        <div class="message-log">
-          <h3>Message Log</h3>
-          <div id="message-container"></div>
-        </div>
-      </div>
-    </main>
-
-    <footer>
-      <p>Barreiros ThreeAI Project</p>
-    </footer>
-  </div>
-
-  <script type="module" src="./main.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ThreeAI</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.jsx"></script>
+  </body>
 </html>

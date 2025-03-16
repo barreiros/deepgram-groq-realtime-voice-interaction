@@ -2,16 +2,16 @@
 
 ## Project Overview
 
-This project is a full-stack application that demonstrates the integration of Three.js for 3D rendering with real-time WebSocket communication between a frontend and backend. The application allows users to interact with a 3D scene while exchanging messages with a server in real-time.
+This project is a full-stack application that demonstrates the integration of Three.js for 3D rendering with real-time WebSocket communication between a React frontend and Express.js backend. The application allows users to interact with a 3D scene while exchanging messages with a server in real-time.
 
 ## Technology Stack
 
 ### Frontend
 
+- **React**: JavaScript library for building user interfaces
 - **ViteJS**: Fast, modern frontend build tool and development server
 - **Three.js**: JavaScript 3D library for creating and displaying animated 3D computer graphics
 - **WebSocket Client**: Native WebSocket API for real-time communication with the backend
-- **Vanilla JavaScript**: No additional frontend frameworks, using pure JavaScript
 
 ### Backend
 
@@ -24,15 +24,19 @@ This project is a full-stack application that demonstrates the integration of Th
 ```
 /
 ├── package.json         # Project configuration and dependencies
-├── vite.config.js       # ViteJS configuration
-├── .clientrules         # This file - project documentation
+├── vite.config.js      # ViteJS configuration with React plugin
+├── .clientrules        # This file - project documentation
 ├── src/
-│   ├── frontend/        # Frontend code
-│   │   ├── index.html   # Main HTML file
-│   │   ├── style.css    # CSS styles
-│   │   └── main.js      # JavaScript with Three.js and WebSocket client
-│   └── backend/         # Backend code
-│       └── server.js    # Express server with WebSocket support
+│   ├── frontend/       # Frontend code
+│   │   ├── index.html  # Main HTML file
+│   │   ├── style.css   # CSS styles
+│   │   ├── main.jsx    # React entry point
+│   │   └── components/ # React components
+│   │       ├── App.jsx        # Root component
+│   │       ├── Scene.jsx      # Three.js scene component
+│   │       └── WebSocketConnection.jsx # WebSocket handler
+│   └── backend/        # Backend code
+│       └── server.js   # Express server with WebSocket support
 ```
 
 ## Development Setup
@@ -64,12 +68,27 @@ This will start:
 
 ## Features
 
-1. **3D Visualization**: Interactive 3D scene using Three.js
-2. **Real-time Communication**: WebSocket connection between frontend and backend
-3. **Message Exchange**: Send and receive messages that affect the 3D scene
-4. **Responsive Design**: Adapts to different screen sizes
+1. **React Components**: Modular component architecture
+2. **3D Visualization**: Interactive 3D scene using Three.js
+3. **Real-time Communication**: WebSocket connection between frontend and backend
+4. **Message Exchange**: Send and receive messages that affect the 3D scene
+5. **Responsive Design**: Adapts to different screen sizes
 
 ## Implementation Details
+
+### React Component Structure
+
+- **App.jsx**: Root component managing state and component composition
+- **Scene.jsx**: Handles Three.js scene setup and rendering
+- **WebSocketConnection.jsx**: Manages WebSocket communication
+
+### Component Guidelines
+
+1. **Size Limit**: Components should not exceed 200 lines of code
+2. **Single Responsibility**: Each component should have a clear, focused purpose
+3. **Props Interface**: Clear prop types and documentation
+4. **State Management**: Local state when possible, lifted state when necessary
+5. **Error Boundaries**: Implement error boundaries for critical components
 
 ### WebSocket Communication
 
