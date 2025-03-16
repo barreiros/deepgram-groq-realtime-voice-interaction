@@ -1,3 +1,10 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
 .chat-container {
   position: fixed;
   bottom: 20px;
@@ -39,11 +46,15 @@
   align-self: flex-start;
 }
 
+.error {
+  background: #dc3545;
+  align-self: flex-start;
+}
+
 .controls {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
 }
 
 .audio-status {
@@ -51,11 +62,6 @@
   color: rgba(255, 255, 255, 0.8);
   text-align: center;
   margin: 4px 0;
-}
-
-form {
-  display: flex;
-  gap: 8px;
 }
 
 .record-button {
@@ -66,6 +72,14 @@ form {
   gap: 8px;
   background: #424242;
   padding: 10px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
+
+.record-button:hover {
+  background: #505050;
 }
 
 .record-button.recording {
@@ -85,51 +99,13 @@ form {
 }
 
 @keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-  100% {
-    opacity: 1;
-  }
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 
 @keyframes blink {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-input {
-  flex: 1;
-  padding: 8px;
-  border: none;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  background: #0084ff;
-  color: white;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #0073e6;
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
 }

@@ -157,36 +157,9 @@ export default function App() {
     }
   }
 
-  const testAddPrimitive = () => {
-    console.log('Test button clicked, sceneAPI:', sceneAPIRef.current)
-    if (sceneAPIRef.current?.addPrimitive) {
-      console.log('Manually calling addPrimitive with: cube')
-      sceneAPIRef.current.addPrimitive('cube')
-    } else {
-      console.error('Cannot test addPrimitive: sceneAPI not available')
-    }
-  }
-
   return (
     <div>
       <Scene onSceneReady={handleSceneReady} />
-      <button
-        onClick={testAddPrimitive}
-        style={{
-          position: 'absolute',
-          top: '10px',
-          right: '10px',
-          zIndex: 1000,
-          padding: '8px 16px',
-          background: '#4CAF50',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-        }}
-      >
-        Test Add Cube
-      </button>
       <div className="chat-container">
         <div className="messages">
           {messages.map((msg, index) => (
@@ -199,7 +172,7 @@ export default function App() {
         </div>
         <div className="audio-status">{audioStatus}</div>
         <div className="controls">
-          <form onSubmit={handleSendMessage}>
+          {/* <form onSubmit={handleSendMessage}>
             <input
               type="text"
               value={inputMessage}
@@ -207,7 +180,7 @@ export default function App() {
               placeholder="Type a message..."
             />
             <button type="submit">Send</button>
-          </form>
+          </form> */}
           <button
             className={`record-button ${isRecording ? 'recording' : ''}`}
             onClick={toggleRecording}
