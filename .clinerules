@@ -99,3 +99,12 @@ This project serves as a foundation that can be extended in various ways:
 - If the WebSocket connection fails, check that both servers are running
 - If 3D rendering issues occur, verify WebGL support in your browser
 - For CORS issues, check the proxy settings in vite.config.js
+
+## Very very important
+
+- At the end of the task you never should execute "npm run dev" or "open http://localhost..." because the project is already launched.
+- Avoid to be verbose. It's not neccessary to explain your changes: just do it.
+- Do not return other text than the neccessary code to change in the application, I dont need explanations.
+- When you receive the command "close the task" or similar, you remove the consoles related with the task and commit the changes.
+- When you receive the command "debug the flow" or similar you should add consoles to the code to have an output of the main values involved in the issue that we need to fix.
+- Only output code, no text explanations.
