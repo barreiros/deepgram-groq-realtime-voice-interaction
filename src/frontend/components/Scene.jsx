@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useImperativeHandle } from 'react'
 import * as THREE from 'three'
+import { Vector3 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 
 const Scene = React.forwardRef((props, ref) => {
@@ -8,6 +9,7 @@ const Scene = React.forwardRef((props, ref) => {
   const cameraRef = useRef(null)
   const rendererRef = useRef(null)
   const controlsRef = useRef(null)
+  const meshesRef = useRef([])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -40,6 +42,16 @@ const Scene = React.forwardRef((props, ref) => {
     const animate = () => {
       requestAnimationFrame(animate)
       controls.update()
+
+      meshesRef.current.forEach((mesh) => {
+        const time = Date.now() * 0.001
+        mesh.position.x = Math.sin(time * mesh.speed.x) * 2
+        mesh.position.y = Math.cos(time * mesh.speed.y) * 2
+        mesh.position.z = Math.sin(time * mesh.speed.z) * 2
+        mesh.rotation.x += 0.01 * mesh.speed.x
+        mesh.rotation.y += 0.01 * mesh.speed.y
+      })
+
       renderer.render(scene, camera)
     }
 
@@ -87,8 +99,14 @@ const Scene = React.forwardRef((props, ref) => {
       })
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.set(0, 0, 0)
+      mesh.speed = new Vector3(
+        Math.random() * 0.5 + 0.5,
+        Math.random() * 0.5 + 0.5,
+        Math.random() * 0.5 + 0.5
+      )
       if (sceneRef.current) {
         sceneRef.current.add(mesh)
+        meshesRef.current.push(mesh)
       }
     },
   }))
