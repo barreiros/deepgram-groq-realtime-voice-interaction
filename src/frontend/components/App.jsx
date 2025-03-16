@@ -12,7 +12,12 @@ export default function App() {
   const ws = useRef(null)
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
-  const sceneRef = useRef(null)
+  const sceneAPIRef = useRef(null)
+
+  const handleSceneReady = (api) => {
+    console.log('Scene API ready:', api)
+    sceneAPIRef.current = api
+  }
 
   useEffect(() => {
     if (!ws.current) {
@@ -32,31 +37,41 @@ export default function App() {
 
   const handleWebSocketMessage = (data) => {
     try {
+      console.log('Raw WebSocket message received:', data)
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-      // console.log('Received WebSocket message:', parsedData)
+      console.log('Parsed WebSocket message:', parsedData)
       setMessages((prev) => [...prev, { type: 'received', text: parsedData }])
 
-      if (parsedData.candidates?.[0]?.content?.parts?.[0]?.text) {
-        const textResponse = parsedData.candidates[0].content.parts[0].text
-        console.log('Text response:', textResponse)
-      }
-
-      // Handle stream actions
       if (parsedData?.toolCall?.functionCalls[0]) {
         const functionCall = parsedData?.toolCall?.functionCalls[0]
         if (functionCall.name === 'stream_action') {
           try {
             const { action, payload } = functionCall.args
             const parsedPayload = JSON.parse(payload)
-            console.log('Stream action:', action, 'Payload:', parsedPayload)
 
-            switch (action) {
-              case 'addNode':
-                if (sceneRef.current?.addPrimitive) {
-                  sceneRef.current.addPrimitive(parsedPayload.type || 'cube')
-                }
-                break
-              // Add other action cases here
+            console.log(
+              'Received stream action:',
+              action,
+              parsedPayload,
+              sceneAPIRef.current
+            )
+            console.log('Action received:', action, 'Expected: addNode')
+
+            // Try both addNode and add_node for compatibility
+            if (action === 'addNode' || action === 'add_node') {
+              console.log(
+                'addNode action triggered, sceneAPI:',
+                sceneAPIRef.current
+              )
+              if (sceneAPIRef.current?.addPrimitive) {
+                console.log(
+                  'Calling addPrimitive with:',
+                  parsedPayload.type || 'cube'
+                )
+                sceneAPIRef.current.addPrimitive(parsedPayload.type || 'cube')
+              } else {
+                console.error('sceneAPI.addPrimitive is not available')
+              }
             }
           } catch (error) {
             console.error('Error processing stream action:', error)
@@ -71,8 +86,6 @@ export default function App() {
           inlineData.mimeType &&
           inlineData.mimeType.startsWith('audio/pcm')
         ) {
-          console.log('Found PCM audio data, attempting to play...')
-          console.log('MIME type:', inlineData.mimeType)
           audioPlayback.current.playAudio(inlineData.data, inlineData.mimeType)
         }
       }
@@ -144,9 +157,36 @@ export default function App() {
     }
   }
 
+  const testAddPrimitive = () => {
+    console.log('Test button clicked, sceneAPI:', sceneAPIRef.current)
+    if (sceneAPIRef.current?.addPrimitive) {
+      console.log('Manually calling addPrimitive with: cube')
+      sceneAPIRef.current.addPrimitive('cube')
+    } else {
+      console.error('Cannot test addPrimitive: sceneAPI not available')
+    }
+  }
+
   return (
     <div>
-      <Scene ref={sceneRef} />
+      <Scene onSceneReady={handleSceneReady} />
+      <button
+        onClick={testAddPrimitive}
+        style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 1000,
+          padding: '8px 16px',
+          background: '#4CAF50',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+        }}
+      >
+        Test Add Cube
+      </button>
       <div className="chat-container">
         <div className="messages">
           {messages.map((msg, index) => (
