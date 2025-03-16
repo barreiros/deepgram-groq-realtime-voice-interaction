@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Scene from './Scene'
-import WebSocketClient from '../WebSocket'
+import GeminiWebSocketService from '../services/gemini/GeminiWebSocketService'
 
 export default function App() {
   const [messages, setMessages] = useState([])
@@ -9,7 +9,9 @@ export default function App() {
 
   useEffect(() => {
     if (!ws.current) {
-      ws.current = new WebSocketClient(handleWebSocketMessage)
+      ws.current = new GeminiWebSocketService({
+        onMessage: handleWebSocketMessage,
+      })
     }
   }, [])
 
