@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Scene from './Scene'
 import GeminiWebSocketService from '../services/gemini/GeminiWebSocketService'
 import { AudioRecordingService } from '../services/audio/AudioRecordingService'
+import AudioPlaybackService from '../services/audio/AudioPlaybackService'
 
 export default function App() {
   const [messages, setMessages] = useState([])
@@ -10,12 +11,16 @@ export default function App() {
   const [audioStatus, setAudioStatus] = useState('')
   const ws = useRef(null)
   const audioService = useRef(null)
+  const audioPlayback = useRef(null)
 
   useEffect(() => {
     if (!ws.current) {
       ws.current = new GeminiWebSocketService({
         onMessage: handleWebSocketMessage,
       })
+    }
+    if (!audioPlayback.current) {
+      audioPlayback.current = new AudioPlaybackService()
     }
     return () => {
       if (audioService.current) {
@@ -27,7 +32,26 @@ export default function App() {
   const handleWebSocketMessage = (data) => {
     try {
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data
+      console.log('Received WebSocket message:', parsedData)
       setMessages((prev) => [...prev, { type: 'received', text: parsedData }])
+
+      if (parsedData.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const textResponse = parsedData.candidates[0].content.parts[0].text
+        console.log('Text response:', textResponse)
+      }
+
+      if (parsedData.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
+        const inlineData =
+          parsedData.serverContent.modelTurn.parts[0].inlineData
+        if (
+          inlineData.mimeType &&
+          inlineData.mimeType.startsWith('audio/pcm')
+        ) {
+          console.log('Found PCM audio data, attempting to play...')
+          console.log('MIME type:', inlineData.mimeType)
+          audioPlayback.current.playAudio(inlineData.data, inlineData.mimeType)
+        }
+      }
     } catch (error) {
       console.error('Error handling WebSocket message:', error)
     }

@@ -39,8 +39,6 @@ class BaseWebSocketService {
 
   sendMessage(message) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('BaseWebSocketService sending message:', message)
-      console.log('WebSocket readyState:', this.ws.readyState)
       this.ws.send(JSON.stringify(message))
     } else {
       console.error('WebSocket not ready. State:', this.ws?.readyState)

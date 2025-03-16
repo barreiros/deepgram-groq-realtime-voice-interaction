@@ -122,7 +122,6 @@ export class GeminiService {
       }
 
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-        console.log('Forwarding to Gemini:', JSON.stringify(data))
         geminiWs.send(JSON.stringify(data))
       } else if (geminiWs) {
         console.log('Waiting for Gemini connection to be ready...')
