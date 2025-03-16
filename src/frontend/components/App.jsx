@@ -1,11 +1,17 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Scene from './Scene'
-import WebSocketConnection from './WebSocketConnection'
+import WebSocketClient from '../WebSocket'
 
 export default function App() {
   const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')
-  const wsRef = useRef(null)
+  const ws = useRef(null)
+
+  useEffect(() => {
+    if (!ws.current) {
+      ws.current = new WebSocketClient(handleWebSocketMessage)
+    }
+  }, [])
 
   const handleWebSocketMessage = (data) => {
     try {
@@ -20,7 +26,7 @@ export default function App() {
     e.preventDefault()
     if (inputMessage.trim()) {
       setMessages((prev) => [...prev, { type: 'sent', text: inputMessage }])
-      wsRef.current.sendMessage({
+      ws.current.sendMessage({
         realtimeInput: {
           mediaChunks: [inputMessage],
         },
@@ -32,10 +38,6 @@ export default function App() {
   return (
     <div>
       <Scene />
-      <WebSocketConnection
-        onMessage={handleWebSocketMessage}
-        ref={(ref) => (wsRef.current = ref)}
-      />
       <div className="chat-container">
         <div className="messages">
           {messages.map((msg, index) => (
