@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 
@@ -8,7 +7,6 @@ export default function Scene() {
   const sceneRef = useRef(null)
   const cameraRef = useRef(null)
   const rendererRef = useRef(null)
-  const cubeRef = useRef(null)
   const controlsRef = useRef(null)
 
   useEffect(() => {
@@ -28,12 +26,6 @@ export default function Scene() {
     mount.appendChild(renderer.domElement)
     rendererRef.current = renderer
 
-    const geometry = new THREE.BoxGeometry()
-    const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 })
-    const cube = new THREE.Mesh(geometry, material)
-    scene.add(cube)
-    cubeRef.current = cube
-
     const ambientLight = new THREE.AmbientLight(0x404040)
     scene.add(ambientLight)
 
@@ -45,10 +37,41 @@ export default function Scene() {
     controls.enableDamping = true
     controlsRef.current = controls
 
+    const addRandomPrimitive = () => {
+      const primitives = [
+        () => new THREE.BoxGeometry(1, 1, 1),
+        () => new THREE.SphereGeometry(0.5, 32, 32),
+        () => new THREE.ConeGeometry(0.5, 1, 32),
+        () => new THREE.TorusGeometry(0.5, 0.2, 16, 100),
+      ]
+
+      const randomGeometry =
+        primitives[Math.floor(Math.random() * primitives.length)]()
+      const material = new THREE.MeshPhongMaterial({
+        color: Math.random() * 0xffffff,
+        shininess: 100,
+      })
+      const mesh = new THREE.Mesh(randomGeometry, material)
+
+      mesh.position.set(
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10
+      )
+
+      mesh.rotation.set(
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2
+      )
+
+      scene.add(mesh)
+    }
+
+    window.addRandomPrimitive = addRandomPrimitive
+
     const animate = () => {
       requestAnimationFrame(animate)
-      cube.rotation.x += 0.01
-      cube.rotation.y += 0.01
       controls.update()
       renderer.render(scene, camera)
     }
@@ -68,8 +91,6 @@ export default function Scene() {
     return () => {
       window.removeEventListener('resize', handleResize)
       mount.removeChild(renderer.domElement)
-      geometry.dispose()
-      material.dispose()
     }
   }, [])
 

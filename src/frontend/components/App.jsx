@@ -40,6 +40,27 @@ export default function App() {
         console.log('Text response:', textResponse)
       }
 
+      // Handle stream actions
+      if (parsedData.toolCall?.functionCalls[0]) {
+        const functionCall = parsedData.toolCall.functionCalls[0]
+        if (functionCall.name === 'stream_action') {
+          try {
+            const { action, payload } = functionCall.args
+            const parsedPayload = JSON.parse(payload)
+            console.log('Stream action:', action, 'Payload:', parsedPayload)
+
+            switch (action) {
+              case 'addNode':
+                window.addRandomPrimitive()
+                break
+              // Add other action cases here
+            }
+          } catch (error) {
+            console.error('Error processing stream action:', error)
+          }
+        }
+      }
+
       if (parsedData.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
         const inlineData =
           parsedData.serverContent.modelTurn.parts[0].inlineData

@@ -14,6 +14,17 @@ Here's how to correctly use the `stream_action` tool:
 
 ## Actions You Can Perform
 
+### Add Node
+
+Use this when you want to add a new primitive object to the scene.
+
+```json
+{
+  "action": "addNode",
+  "date": <timestamp>
+}
+```
+
 ### Change Position
 
 Use this when the user wants to move an object.

@@ -43,6 +43,7 @@ export class GeminiService {
                       type: 'string',
                       description: 'The name of the action to perform',
                       enum: [
+                        'addNode',
                         'changePosition',
                         'changeRotation',
                         'changeScale',
