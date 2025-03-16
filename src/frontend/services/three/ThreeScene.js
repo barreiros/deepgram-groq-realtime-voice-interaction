@@ -146,7 +146,9 @@ export class ThreeScene {
       const shape = new Ammo.btBoxShape(
         new Ammo.btVector3(wall.size[0] / 2, wall.size[1] / 2, wall.size[2] / 2)
       )
-      shape.setMargin(0.05)
+      if (shape.setMargin) {
+        shape.setMargin(0.05)
+      }
       const transform = new Ammo.btTransform()
       transform.setIdentity()
       transform.setOrigin(new Ammo.btVector3(...wall.position))
@@ -279,7 +281,9 @@ export class ThreeScene {
       Math.random() * Math.PI,
       Math.random() * Math.PI
     )
-    shape.setMargin(0.05)
+    if (shape.setMargin) {
+      shape.setMargin(0.05)
+    }
 
     const transform = new Ammo.btTransform()
     transform.setIdentity()
