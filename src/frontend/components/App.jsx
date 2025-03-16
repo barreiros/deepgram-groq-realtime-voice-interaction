@@ -161,11 +161,11 @@ export default function App() {
     <div className="m-0 p-0 overflow-hidden h-full">
       <Scene onSceneReady={handleSceneReady} />
       <div className="fixed bottom-5 right-5 w-[300px] bg-black/80 rounded-lg p-4 text-white max-h-[400px] flex flex-col">
-        <div className="flex-1 overflow-y-auto mb-2.5 flex flex-col gap-2 max-h-[300px]">
+        <div className="flex-1 overflow-y-auto mb-2.5 flex flex-col gap-2 max-h-[300px] scrollbar-none">
           {messages.map((msg, index) => (
             <div
               key={index}
-              className={`px-3 py-2 rounded-2xl max-w-[80%] ${
+              className={`px-3 py-2 rounded-2xl max-w-[80%] break-words whitespace-pre-wrap ${
                 msg.type === 'sent'
                   ? 'bg-blue-500 self-end'
                   : msg.type === 'received'
@@ -173,9 +173,13 @@ export default function App() {
                   : 'bg-red-600 self-start'
               }`}
             >
-              {typeof msg.text === 'string'
-                ? msg.text
-                : JSON.stringify(msg.text)}
+              {(() => {
+                const text =
+                  typeof msg.text === 'string'
+                    ? msg.text
+                    : JSON.stringify(msg.text)
+                return text.length > 200 ? text.slice(0, 200) + '...' : text
+              })()}
             </div>
           ))}
         </div>

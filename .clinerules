@@ -9,6 +9,7 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 ### Frontend
 
 - **React**: JavaScript library for building user interfaces
+- **Tailwind CSS**: Utility-first CSS framework with plugins (scrollbar, etc.)
 - **ViteJS**: Fast, modern frontend build tool and development server
 - **Three.js**: JavaScript 3D library for creating and displaying animated 3D computer graphics
 - **WebSocket Client**: Native WebSocket API for real-time communication
