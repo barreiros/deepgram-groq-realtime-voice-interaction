@@ -25,7 +25,17 @@ export default function WebSocketConnection({ onMessage }) {
     }
 
     return () => {
-      ws.close()
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (wsRef.current) {
+      wsRef.current.onmessage = (event) => {
+        onMessage(event.data)
+      }
     }
   }, [onMessage])
 
