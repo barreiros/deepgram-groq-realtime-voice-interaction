@@ -22,7 +22,8 @@ Use this when you want to add a new primitive object to the scene.
 {
   "action": "addNode",
   "payload": {
-    "type": "cube | sphere | cone | torus"
+    "type": "cube | sphere | cone | torus",
+    "color": "hexadecimal color code (optional, e.g. #ff0000 for red)"
   }
 }
 ```

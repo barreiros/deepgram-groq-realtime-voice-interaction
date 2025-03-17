@@ -19,24 +19,13 @@ class AudioPlaybackService {
       const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1]) || 24000
 
       const floatArray = await this.decodeAudioData(audioData)
-      console.log('Decoded audio chunk length:', floatArray.length)
-
       const processedBuffer = await this.processAudioChunk(
         floatArray,
         sampleRate
       )
 
       if (processedBuffer) {
-        console.log(
-          'Complete word detected, buffer length:',
-          processedBuffer.length
-        )
         this.addToAudioQueue(processedBuffer)
-      } else {
-        console.log(
-          'Buffering chunk, current word buffer size:',
-          this.currentWordBuffer.length
-        )
       }
     } catch (error) {
       console.error('Error processing audio:', error)
@@ -80,10 +69,6 @@ class AudioPlaybackService {
     }
 
     if (silenceDetected && this.currentWordBuffer.length > 0) {
-      console.log(
-        'Silence detected, combining chunks:',
-        this.currentWordBuffer.length
-      )
       // Combine all chunks in the word buffer
       const totalLength = this.currentWordBuffer.reduce(
         (sum, chunk) => sum + chunk.length,

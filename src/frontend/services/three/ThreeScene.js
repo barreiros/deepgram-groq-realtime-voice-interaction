@@ -43,7 +43,6 @@ export class ThreeScene {
   initPhysics() {
     // Only initialize physics once
     if (!physicsWorld) {
-      console.log('Initializing Ammo.js physics')
       try {
         const collisionConfiguration =
           new Ammo.btDefaultCollisionConfiguration()
@@ -324,11 +323,7 @@ export class ThreeScene {
     this.renderer.render(this.scene, this.camera)
   }
 
-  addPrimitive = (type) => {
-    console.log('ThreeScene.addPrimitive called with type:', type)
-    console.log('this.scene:', this.scene)
-    console.log('this.physicsWorld:', this.physicsWorld)
-
+  addPrimitive = (type, color = null) => {
     if (!this.scene || !this.physicsWorld) {
       console.error('Scene or physicsWorld is not initialized')
       return
@@ -358,7 +353,7 @@ export class ThreeScene {
     }
 
     const material = new THREE.MeshPhongMaterial({
-      color: Math.random() * 0xffffff,
+      color: color || Math.random() * 0xffffff,
       shininess: 100,
     })
     const mesh = new THREE.Mesh(geometry, material)

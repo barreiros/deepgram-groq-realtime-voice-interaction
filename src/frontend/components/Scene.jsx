@@ -9,26 +9,24 @@ const Scene = ({ onSceneReady }) => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    console.log('Scene mounted')
-
-    // Error boundary
     try {
       if (mountRef.current) {
         // Only create a new instance if one doesn't exist
         if (!threeSceneInstance) {
-          console.log('Creating new ThreeScene instance')
           threeSceneInstance = new ThreeScene(mountRef.current)
-        } else {
-          console.log('Reusing existing ThreeScene instance')
         }
 
         if (onSceneReady) {
-          console.log('Setting sceneAPI with addPrimitive function')
           const api = {
-            addPrimitive: (type) => {
-              console.log('addPrimitive called from API with type:', type)
+            addPrimitive: (type, color) => {
+              console.log(
+                'addPrimitive called from API with type:',
+                type,
+                'color:',
+                color
+              )
               if (threeSceneInstance) {
-                threeSceneInstance.addPrimitive(type)
+                threeSceneInstance.addPrimitive(type, color)
               } else {
                 console.error(
                   'ThreeScene instance is null when trying to add primitive'

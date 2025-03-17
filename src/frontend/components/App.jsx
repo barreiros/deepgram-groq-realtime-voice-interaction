@@ -15,7 +15,6 @@ export default function App() {
   const sceneAPIRef = useRef(null)
 
   const handleSceneReady = (api) => {
-    console.log('Scene API ready:', api)
     sceneAPIRef.current = api
   }
 
@@ -37,9 +36,7 @@ export default function App() {
 
   const handleWebSocketMessage = (data) => {
     try {
-      console.log('Raw WebSocket message received:', data)
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-      console.log('Parsed WebSocket message:', parsedData)
       setMessages((prev) => [...prev, { type: 'received', text: parsedData }])
 
       if (parsedData?.toolCall?.functionCalls[0]) {
@@ -49,26 +46,13 @@ export default function App() {
             const { action, payload } = functionCall.args
             const parsedPayload = JSON.parse(payload)
 
-            console.log(
-              'Received stream action:',
-              action,
-              parsedPayload,
-              sceneAPIRef.current
-            )
-            console.log('Action received:', action, 'Expected: addNode')
-
-            // Try both addNode and add_node for compatibility
             if (action === 'addNode' || action === 'add_node') {
-              console.log(
-                'addNode action triggered, sceneAPI:',
-                sceneAPIRef.current
-              )
               if (sceneAPIRef.current?.addPrimitive) {
-                console.log(
-                  'Calling addPrimitive with:',
-                  parsedPayload.type || 'cube'
+                console.log('Add node', parsedPayload)
+                sceneAPIRef.current.addPrimitive(
+                  parsedPayload.type || 'cube',
+                  parsedPayload.color
                 )
-                sceneAPIRef.current.addPrimitive(parsedPayload.type || 'cube')
               } else {
                 console.error('sceneAPI.addPrimitive is not available')
               }
