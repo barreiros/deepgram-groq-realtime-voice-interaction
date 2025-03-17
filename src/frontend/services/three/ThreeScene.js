@@ -75,15 +75,14 @@ export class ThreeScene {
     const height = this.container.clientHeight
 
     this.scene = new THREE.Scene()
-    this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000)
-    this.camera.position.set(0, 5, 10)
+    this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
+    this.camera.position.set(0, 0, 25)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(width, height)
     this.container.appendChild(this.renderer.domElement)
-
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-    this.controls.enableDamping = true
+    this.isDragging = false
+    this.previousMousePosition = { x: 0, y: 0 }
   }
 
   initLights() {
@@ -96,37 +95,41 @@ export class ThreeScene {
   }
 
   initRoom() {
+    this.roomContainer = new THREE.Group()
+    this.roomContainer.position.y = 0
+    this.scene.add(this.roomContainer)
+
     const roomSize = 10
     const wallThickness = 0.5
     const walls = [
       {
         size: [roomSize, wallThickness, roomSize],
-        position: [0, -2, 0],
+        position: [0, -5, 0],
         rotation: [0, 0, 0],
       },
       {
         size: [roomSize, wallThickness, roomSize],
-        position: [0, 8, 0],
+        position: [0, 5, 0],
         rotation: [0, 0, 0],
       },
       {
-        size: [roomSize, 10, wallThickness],
-        position: [0, 3, -roomSize / 2],
+        size: [roomSize, roomSize, wallThickness],
+        position: [0, 0, -roomSize / 2],
         rotation: [0, 0, 0],
       },
       {
-        size: [roomSize, 10, wallThickness],
-        position: [0, 3, roomSize / 2],
+        size: [roomSize, roomSize, wallThickness],
+        position: [0, 0, roomSize / 2],
         rotation: [0, 0, 0],
       },
       {
-        size: [wallThickness, 10, roomSize],
-        position: [-roomSize / 2, 3, 0],
+        size: [wallThickness, roomSize, roomSize],
+        position: [-roomSize / 2, 0, 0],
         rotation: [0, 0, 0],
       },
       {
-        size: [wallThickness, 10, roomSize],
-        position: [roomSize / 2, 3, 0],
+        size: [wallThickness, roomSize, roomSize],
+        position: [roomSize / 2, 0, 0],
         rotation: [0, 0, 0],
       },
     ]
@@ -141,7 +144,7 @@ export class ThreeScene {
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.set(...wall.position)
       mesh.rotation.set(...wall.rotation)
-      this.scene.add(mesh)
+      this.roomContainer.add(mesh)
 
       const shape = new Ammo.btBoxShape(
         new Ammo.btVector3(wall.size[0] / 2, wall.size[1] / 2, wall.size[2] / 2)
@@ -165,7 +168,83 @@ export class ThreeScene {
     })
   }
 
+  rotateRoom = (axis, angle) => {
+    if (this.roomContainer) {
+      switch (axis) {
+        case 'x':
+          this.roomContainer.rotation.x += angle
+          break
+        case 'y':
+          this.roomContainer.rotation.y += angle
+          break
+        case 'z':
+          this.roomContainer.rotation.z += angle
+          break
+      }
+
+      const quaternion = new Ammo.btQuaternion(
+        this.roomContainer.quaternion.x,
+        this.roomContainer.quaternion.y,
+        this.roomContainer.quaternion.z,
+        this.roomContainer.quaternion.w
+      )
+
+      this.physicsWorld.setGravity(
+        new Ammo.btVector3(
+          -9.8 * Math.sin(this.roomContainer.rotation.z),
+          -9.8 *
+            Math.cos(this.roomContainer.rotation.x) *
+            Math.cos(this.roomContainer.rotation.z),
+          -9.8 * Math.sin(this.roomContainer.rotation.x)
+        )
+      )
+    }
+  }
+
+  handleMouseDown = (event) => {
+    this.isDragging = true
+    this.previousMousePosition = {
+      x: event.clientX,
+      y: event.clientY,
+    }
+  }
+
+  handleMouseMove = (event) => {
+    if (!this.isDragging) return
+
+    const deltaMove = {
+      x: event.clientX - this.previousMousePosition.x,
+      y: event.clientY - this.previousMousePosition.y,
+    }
+
+    if (this.roomContainer) {
+      this.roomContainer.rotation.y += deltaMove.x * 0.005
+      this.roomContainer.rotation.x += deltaMove.y * 0.005
+
+      this.physicsWorld.setGravity(
+        new Ammo.btVector3(
+          -9.8 * Math.sin(this.roomContainer.rotation.z),
+          -9.8 *
+            Math.cos(this.roomContainer.rotation.x) *
+            Math.cos(this.roomContainer.rotation.z),
+          -9.8 * Math.sin(this.roomContainer.rotation.x)
+        )
+      )
+    }
+
+    this.previousMousePosition = {
+      x: event.clientX,
+      y: event.clientY,
+    }
+  }
+
+  handleMouseUp = () => {
+    this.isDragging = false
+  }
+
   handleClick = (event) => {
+    if (this.isDragging) return
+
     const rect = this.renderer.domElement.getBoundingClientRect()
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -206,19 +285,27 @@ export class ThreeScene {
   }
 
   initEventListeners() {
-    this.renderer.domElement.addEventListener('click', this.handleClick)
+    const canvas = this.renderer.domElement
+    canvas.addEventListener('mousedown', this.handleMouseDown)
+    canvas.addEventListener('mousemove', this.handleMouseMove)
+    canvas.addEventListener('mouseup', this.handleMouseUp)
+    canvas.addEventListener('mouseleave', this.handleMouseUp)
+    canvas.addEventListener('click', this.handleClick)
     window.addEventListener('resize', this.handleResize)
   }
 
   removeEventListeners() {
-    this.renderer.domElement.removeEventListener('click', this.handleClick)
+    const canvas = this.renderer.domElement
+    canvas.removeEventListener('mousedown', this.handleMouseDown)
+    canvas.removeEventListener('mousemove', this.handleMouseMove)
+    canvas.removeEventListener('mouseup', this.handleMouseUp)
+    canvas.removeEventListener('mouseleave', this.handleMouseUp)
+    canvas.removeEventListener('click', this.handleClick)
     window.removeEventListener('resize', this.handleResize)
   }
 
   animate = () => {
     requestAnimationFrame(this.animate)
-    this.controls.update()
-
     if (this.physicsWorld) {
       this.physicsWorld.stepSimulation(1 / 60, 10)
 
@@ -275,7 +362,7 @@ export class ThreeScene {
       shininess: 100,
     })
     const mesh = new THREE.Mesh(geometry, material)
-    mesh.position.set(0, 2, 0)
+    mesh.position.set(0, 3, 0)
     mesh.rotation.set(
       Math.random() * Math.PI,
       Math.random() * Math.PI,
@@ -328,7 +415,7 @@ export class ThreeScene {
     body.motionState = motionState
 
     this.rigidBodies.push(body)
-    this.scene.add(mesh)
+    this.roomContainer.add(mesh)
   }
 
   dispose() {

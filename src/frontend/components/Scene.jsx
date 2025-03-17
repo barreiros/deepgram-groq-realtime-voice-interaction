@@ -35,6 +35,11 @@ const Scene = ({ onSceneReady }) => {
                 )
               }
             },
+            rotateRoom: (axis, angle) => {
+              if (threeSceneInstance) {
+                threeSceneInstance.rotateRoom(axis, angle)
+              }
+            },
           }
           onSceneReady(api)
         }
@@ -44,8 +49,37 @@ const Scene = ({ onSceneReady }) => {
       setError(err)
     }
 
-    // No cleanup in the main component - we want to keep the ThreeScene instance alive
-    // We'll only clean up when the app unmounts
+    const handleKeyDown = (event) => {
+      if (!threeSceneInstance) return
+
+      const rotationAngle = 0.1
+      switch (event.key) {
+        case 'ArrowLeft':
+          threeSceneInstance.rotateRoom('y', rotationAngle)
+          break
+        case 'ArrowRight':
+          threeSceneInstance.rotateRoom('y', -rotationAngle)
+          break
+        case 'ArrowUp':
+          threeSceneInstance.rotateRoom('x', rotationAngle)
+          break
+        case 'ArrowDown':
+          threeSceneInstance.rotateRoom('x', -rotationAngle)
+          break
+        case 'q':
+          threeSceneInstance.rotateRoom('z', rotationAngle)
+          break
+        case 'e':
+          threeSceneInstance.rotateRoom('z', -rotationAngle)
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [onSceneReady])
 
   // Error state
