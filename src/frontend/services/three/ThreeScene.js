@@ -1,22 +1,17 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import * as Ammo from 'ammo.js'
-
-// Static physics objects to ensure we only initialize Ammo.js once
-let physicsWorld = null
-let transformAux = null
+import { PhysicsEngine } from './PhysicsEngine'
 
 export class ThreeScene {
   constructor(container) {
     this.container = container
     this.meshes = []
-    this.rigidBodies = []
     this.orbitRadius = 5
     this.orbitSpeed = 0.5
     this.raycaster = new THREE.Raycaster()
     this.mouse = new THREE.Vector2()
 
-    // Check if we already have a renderer in the container
     if (container.querySelector('canvas')) {
       console.warn(
         'Container already has a canvas. Skipping ThreeScene initialization.'
@@ -29,7 +24,7 @@ export class ThreeScene {
 
   init() {
     try {
-      this.initPhysics()
+      this.physics = new PhysicsEngine()
       this.initScene()
       this.initLights()
       this.initRoom()
@@ -38,35 +33,6 @@ export class ThreeScene {
     } catch (error) {
       console.error('Error initializing ThreeScene:', error)
     }
-  }
-
-  initPhysics() {
-    // Only initialize physics once
-    if (!physicsWorld) {
-      try {
-        const collisionConfiguration =
-          new Ammo.btDefaultCollisionConfiguration()
-        const dispatcher = new Ammo.btCollisionDispatcher(
-          collisionConfiguration
-        )
-        const broadphase = new Ammo.btDbvtBroadphase()
-        const solver = new Ammo.btSequentialImpulseConstraintSolver()
-        physicsWorld = new Ammo.btDiscreteDynamicsWorld(
-          dispatcher,
-          broadphase,
-          solver,
-          collisionConfiguration
-        )
-        physicsWorld.setGravity(new Ammo.btVector3(0, -9.8, 0))
-        transformAux = new Ammo.btTransform()
-      } catch (error) {
-        console.error('Error initializing Ammo.js physics:', error)
-        throw error
-      }
-    }
-
-    this.physicsWorld = physicsWorld
-    this.transformAux = transformAux
   }
 
   initScene() {
@@ -148,22 +114,11 @@ export class ThreeScene {
       const shape = new Ammo.btBoxShape(
         new Ammo.btVector3(wall.size[0] / 2, wall.size[1] / 2, wall.size[2] / 2)
       )
-      if (shape.setMargin) {
-        shape.setMargin(0.05)
-      }
-      const transform = new Ammo.btTransform()
-      transform.setIdentity()
-      transform.setOrigin(new Ammo.btVector3(...wall.position))
-      const motionState = new Ammo.btDefaultMotionState(transform)
-      const rbInfo = new Ammo.btRigidBodyConstructionInfo(
-        0,
-        motionState,
-        shape,
-        new Ammo.btVector3(0, 0, 0)
-      )
-      const body = new Ammo.btRigidBody(rbInfo)
-      body.setRestitution(1.0)
-      this.physicsWorld.addRigidBody(body)
+      this.physics.createRigidBody(mesh, shape, 0, {
+        x: wall.position[0],
+        y: wall.position[1],
+        z: wall.position[2],
+      })
     })
   }
 
@@ -181,21 +136,12 @@ export class ThreeScene {
           break
       }
 
-      const quaternion = new Ammo.btQuaternion(
-        this.roomContainer.quaternion.x,
-        this.roomContainer.quaternion.y,
-        this.roomContainer.quaternion.z,
-        this.roomContainer.quaternion.w
-      )
-
-      this.physicsWorld.setGravity(
-        new Ammo.btVector3(
-          -9.8 * Math.sin(this.roomContainer.rotation.z),
-          -9.8 *
-            Math.cos(this.roomContainer.rotation.x) *
-            Math.cos(this.roomContainer.rotation.z),
-          -9.8 * Math.sin(this.roomContainer.rotation.x)
-        )
+      this.physics.setGravity(
+        -9.8 * Math.sin(this.roomContainer.rotation.z),
+        -9.8 *
+          Math.cos(this.roomContainer.rotation.x) *
+          Math.cos(this.roomContainer.rotation.z),
+        -9.8 * Math.sin(this.roomContainer.rotation.x)
       )
     }
   }
@@ -220,14 +166,12 @@ export class ThreeScene {
       this.roomContainer.rotation.y += deltaMove.x * 0.005
       this.roomContainer.rotation.x += deltaMove.y * 0.005
 
-      this.physicsWorld.setGravity(
-        new Ammo.btVector3(
-          -9.8 * Math.sin(this.roomContainer.rotation.z),
-          -9.8 *
-            Math.cos(this.roomContainer.rotation.x) *
-            Math.cos(this.roomContainer.rotation.z),
-          -9.8 * Math.sin(this.roomContainer.rotation.x)
-        )
+      this.physics.setGravity(
+        -9.8 * Math.sin(this.roomContainer.rotation.z),
+        -9.8 *
+          Math.cos(this.roomContainer.rotation.x) *
+          Math.cos(this.roomContainer.rotation.z),
+        -9.8 * Math.sin(this.roomContainer.rotation.x)
       )
     }
 
@@ -250,27 +194,29 @@ export class ThreeScene {
 
     this.raycaster.setFromCamera(this.mouse, this.camera)
     const intersects = this.raycaster.intersectObjects(
-      this.rigidBodies.map((body) => body.mesh)
+      this.physics.rigidBodies.map((body) => body.mesh)
     )
 
     if (intersects.length > 0) {
       const clickedMesh = intersects[0].object
-      const clickedBody = this.rigidBodies.find(
+      const clickedBody = this.physics.rigidBodies.find(
         (body) => body.mesh === clickedMesh
       )
 
       if (clickedBody) {
-        const force = new Ammo.btVector3(
-          (Math.random() - 0.5) * 20,
-          10,
-          (Math.random() - 0.5) * 20
+        this.physics.applyImpulse(
+          clickedBody,
+          {
+            x: (Math.random() - 0.5) * 20,
+            y: 10,
+            z: (Math.random() - 0.5) * 20,
+          },
+          {
+            x: clickedMesh.position.x,
+            y: clickedMesh.position.y,
+            z: clickedMesh.position.z,
+          }
         )
-        const worldPoint = new Ammo.btVector3(
-          clickedMesh.position.x,
-          clickedMesh.position.y,
-          clickedMesh.position.z
-        )
-        clickedBody.applyImpulse(force, worldPoint)
       }
     }
   }
@@ -305,27 +251,15 @@ export class ThreeScene {
 
   animate = () => {
     requestAnimationFrame(this.animate)
-    if (this.physicsWorld) {
-      this.physicsWorld.stepSimulation(1 / 60, 10)
-
-      this.rigidBodies.forEach((body) => {
-        const ms = body.motionState
-        if (ms) {
-          ms.getWorldTransform(this.transformAux)
-          const p = this.transformAux.getOrigin()
-          const q = this.transformAux.getRotation()
-          body.mesh.position.set(p.x(), p.y(), p.z())
-          body.mesh.quaternion.set(q.x(), q.y(), q.z(), q.w())
-        }
-      })
+    if (this.physics) {
+      this.physics.update()
     }
-
     this.renderer.render(this.scene, this.camera)
   }
 
   addPrimitive = (type, color = null) => {
-    if (!this.scene || !this.physicsWorld) {
-      console.error('Scene or physicsWorld is not initialized')
+    if (!this.scene || !this.physics) {
+      console.error('Scene or physics is not initialized')
       return
     }
 
@@ -363,39 +297,26 @@ export class ThreeScene {
       Math.random() * Math.PI,
       Math.random() * Math.PI
     )
-    if (shape.setMargin) {
-      shape.setMargin(0.05)
-    }
 
-    const transform = new Ammo.btTransform()
-    transform.setIdentity()
-    transform.setOrigin(
-      new Ammo.btVector3(mesh.position.x, mesh.position.y, mesh.position.z)
-    )
-
-    const motionState = new Ammo.btDefaultMotionState(transform)
-    const mass = type === 'torus' ? 2 : 1
-    const localInertia = new Ammo.btVector3(0, 0, 0)
-    shape.calculateLocalInertia(mass, localInertia)
-
-    const rbInfo = new Ammo.btRigidBodyConstructionInfo(
-      mass,
-      motionState,
+    const body = this.physics.createRigidBody(
+      mesh,
       shape,
-      localInertia
+      type === 'torus' ? 2 : 1,
+      {
+        x: mesh.position.x,
+        y: mesh.position.y,
+        z: mesh.position.z,
+      }
     )
-    const body = new Ammo.btRigidBody(rbInfo)
-    body.setFriction(0.8)
-    body.setRollingFriction(0.1)
-    body.setRestitution(0.7)
-    body.setDamping(0.1, 0.1)
 
-    const velocity = new Ammo.btVector3(
-      (Math.random() - 0.5) * 10,
-      (Math.random() - 0.5) * 10,
-      (Math.random() - 0.5) * 10
+    const velocity = {
+      x: (Math.random() - 0.5) * 10,
+      y: (Math.random() - 0.5) * 10,
+      z: (Math.random() - 0.5) * 10,
+    }
+    body.setLinearVelocity(
+      new Ammo.btVector3(velocity.x, velocity.y, velocity.z)
     )
-    body.setLinearVelocity(velocity)
     body.setAngularVelocity(
       new Ammo.btVector3(
         Math.random() - 0.5,
@@ -403,13 +324,7 @@ export class ThreeScene {
         Math.random() - 0.5
       )
     )
-    body.setRestitution(1.0)
 
-    this.physicsWorld.addRigidBody(body)
-    body.mesh = mesh
-    body.motionState = motionState
-
-    this.rigidBodies.push(body)
     this.roomContainer.add(mesh)
   }
 
