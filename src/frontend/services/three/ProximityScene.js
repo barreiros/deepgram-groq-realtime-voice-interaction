@@ -20,7 +20,6 @@ export class ProximityScene {
     try {
       this.initScene()
       this.initLights()
-      this.initCube()
       this.initEventListeners()
       this.animate()
     } catch (error) {
@@ -50,16 +49,6 @@ export class ProximityScene {
     this.scene.add(light)
   }
 
-  initCube() {
-    const geometry = new THREE.BoxGeometry(1, 1, 1)
-    const material = new THREE.MeshPhongMaterial({
-      color: 0x00ff00,
-      shininess: 100,
-    })
-    this.cube = new THREE.Mesh(geometry, material)
-    this.scene.add(this.cube)
-  }
-
   handleResize = () => {
     const width = this.container.clientWidth
     const height = this.container.clientHeight
@@ -78,29 +67,25 @@ export class ProximityScene {
 
   animate = () => {
     requestAnimationFrame(this.animate)
-
-    // Rotate the cube
-    if (this.cube) {
-      this.cube.rotation.x += 0.01
-      this.cube.rotation.y += 0.01
-    }
-
     this.renderer.render(this.scene, this.camera)
   }
 
   rotateRoom = (axis, angle) => {
-    if (this.cube) {
-      switch (axis) {
-        case 'x':
-          this.cube.rotation.x += angle
-          break
-        case 'y':
-          this.cube.rotation.y += angle
-          break
-        case 'z':
-          this.cube.rotation.z += angle
-          break
-      }
+    // Rotate all meshes in the scene
+    if (this.meshes.length > 0) {
+      this.meshes.forEach((mesh) => {
+        switch (axis) {
+          case 'x':
+            mesh.rotation.x += angle
+            break
+          case 'y':
+            mesh.rotation.y += angle
+            break
+          case 'z':
+            mesh.rotation.z += angle
+            break
+        }
+      })
     }
   }
 
@@ -110,11 +95,20 @@ export class ProximityScene {
       return
     }
 
+    console.log('ProximityScene: Adding primitive', type, color)
+
     // Create the primitive using the factory
-    const { mesh } = PrimitiveFactory.createPrimitive(type, color)
+    const { mesh, type: primitiveType } = PrimitiveFactory.createPrimitive(
+      type,
+      color
+    )
 
     // Position the mesh in front of the camera
-    mesh.position.set(0, 0, -2)
+    mesh.position.set(
+      (Math.random() - 0.5) * 3,
+      (Math.random() - 0.5) * 3,
+      -2 + (Math.random() - 0.5)
+    )
 
     // Add random rotation
     mesh.rotation.set(
