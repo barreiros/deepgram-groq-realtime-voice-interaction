@@ -1,22 +1,54 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ThreeScene } from '../services/three/ThreeScene'
+import { ProximityScene } from '../services/three/ProximityScene'
 
-// Create a single instance of ThreeScene that can be reused
+// Create instances that can be reused
 let threeSceneInstance = null
+let proximitySceneInstance = null
 
 const Scene = ({ onSceneReady }) => {
   const mountRef = useRef(null)
   const [error, setError] = useState(null)
+  const [activeScene, setActiveScene] = useState('physics')
+
+  const changeScene = (sceneName) => {
+    // Clean up current scene
+    if (mountRef.current.querySelector('canvas')) {
+      mountRef.current.querySelector('canvas').remove()
+    }
+
+    setActiveScene(sceneName)
+  }
 
   useEffect(() => {
     try {
       if (mountRef.current) {
-        // Only create a new instance if one doesn't exist
-        if (!threeSceneInstance) {
-          threeSceneInstance = new ThreeScene(mountRef.current)
+        let currentInstance = null
+
+        // Initialize or use the appropriate scene based on activeScene
+        if (activeScene === 'physics') {
+          if (!threeSceneInstance) {
+            threeSceneInstance = new ThreeScene(mountRef.current)
+          } else {
+            // Re-initialize if canvas was removed
+            if (!mountRef.current.querySelector('canvas')) {
+              threeSceneInstance.init()
+            }
+          }
+          currentInstance = threeSceneInstance
+        } else if (activeScene === 'proximity') {
+          if (!proximitySceneInstance) {
+            proximitySceneInstance = new ProximityScene(mountRef.current)
+          } else {
+            // Re-initialize if canvas was removed
+            if (!mountRef.current.querySelector('canvas')) {
+              proximitySceneInstance.init()
+            }
+          }
+          currentInstance = proximitySceneInstance
         }
 
-        if (onSceneReady) {
+        if (onSceneReady && currentInstance) {
           const api = {
             addPrimitive: (type, color) => {
               console.log(
@@ -25,17 +57,17 @@ const Scene = ({ onSceneReady }) => {
                 'color:',
                 color
               )
-              if (threeSceneInstance) {
-                threeSceneInstance.addPrimitive(type, color)
+              if (currentInstance) {
+                currentInstance.addPrimitive(type, color)
               } else {
                 console.error(
-                  'ThreeScene instance is null when trying to add primitive'
+                  'Scene instance is null when trying to add primitive'
                 )
               }
             },
             rotateRoom: (axis, angle) => {
-              if (threeSceneInstance) {
-                threeSceneInstance.rotateRoom(axis, angle)
+              if (currentInstance) {
+                currentInstance.rotateRoom(axis, angle)
               }
             },
           }
@@ -48,27 +80,29 @@ const Scene = ({ onSceneReady }) => {
     }
 
     const handleKeyDown = (event) => {
-      if (!threeSceneInstance) return
+      let currentInstance =
+        activeScene === 'physics' ? threeSceneInstance : proximitySceneInstance
+      if (!currentInstance) return
 
       const rotationAngle = 0.1
       switch (event.key) {
         case 'ArrowLeft':
-          threeSceneInstance.rotateRoom('y', rotationAngle)
+          currentInstance.rotateRoom('y', rotationAngle)
           break
         case 'ArrowRight':
-          threeSceneInstance.rotateRoom('y', -rotationAngle)
+          currentInstance.rotateRoom('y', -rotationAngle)
           break
         case 'ArrowUp':
-          threeSceneInstance.rotateRoom('x', rotationAngle)
+          currentInstance.rotateRoom('x', rotationAngle)
           break
         case 'ArrowDown':
-          threeSceneInstance.rotateRoom('x', -rotationAngle)
+          currentInstance.rotateRoom('x', -rotationAngle)
           break
         case 'q':
-          threeSceneInstance.rotateRoom('z', rotationAngle)
+          currentInstance.rotateRoom('z', rotationAngle)
           break
         case 'e':
-          threeSceneInstance.rotateRoom('z', -rotationAngle)
+          currentInstance.rotateRoom('z', -rotationAngle)
           break
       }
     }
@@ -78,7 +112,7 @@ const Scene = ({ onSceneReady }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onSceneReady])
+  }, [onSceneReady, activeScene])
 
   // Error state
   if (error) {
@@ -89,7 +123,27 @@ const Scene = ({ onSceneReady }) => {
     )
   }
 
-  return <div ref={mountRef} style={{ width: '100%', height: '100vh' }} />
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+      <div ref={mountRef} style={{ width: '100%', height: '100vh' }} />
+      <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+        <select
+          value={activeScene}
+          onChange={(e) => changeScene(e.target.value)}
+          style={{
+            padding: '8px',
+            borderRadius: '4px',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            border: '1px solid #444',
+          }}
+        >
+          <option value="physics">Physics Scene</option>
+          <option value="proximity">Proximity Scene</option>
+        </select>
+      </div>
+    </div>
+  )
 }
 
 export default Scene
