@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { PrimitiveFactory } from './PrimitiveFactory'
 
 export class ProximityScene {
   constructor(container) {
@@ -104,10 +105,31 @@ export class ProximityScene {
   }
 
   addPrimitive = (type, color = null) => {
-    // In this scene, we just change the cube color if specified
-    if (color && this.cube) {
-      this.cube.material.color.set(color)
+    if (!this.scene) {
+      console.error('Scene is not initialized')
+      return
     }
+
+    // Create the primitive using the factory
+    const { mesh } = PrimitiveFactory.createPrimitive(type, color)
+
+    // Position the mesh in front of the camera
+    mesh.position.set(0, 0, -2)
+
+    // Add random rotation
+    mesh.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    )
+
+    // Add to scene
+    this.scene.add(mesh)
+
+    // Store in meshes array for potential future reference
+    this.meshes.push(mesh)
+
+    return mesh
   }
 
   dispose() {
