@@ -123,10 +123,34 @@ const Scene = ({ onSceneReady }) => {
     )
   }
 
+  const addRandomPrimitive = () => {
+    const primitiveTypes = ['cube', 'sphere', 'cone', 'torus']
+    const randomType =
+      primitiveTypes[Math.floor(Math.random() * primitiveTypes.length)]
+
+    const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff]
+    const randomColor = colors[Math.floor(Math.random() * colors.length)]
+
+    let currentInstance =
+      activeScene === 'physics' ? threeSceneInstance : proximitySceneInstance
+    if (currentInstance) {
+      currentInstance.addPrimitive(randomType, randomColor)
+    }
+  }
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100vh' }} />
-      <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+        }}
+      >
         <select
           value={activeScene}
           onChange={(e) => changeScene(e.target.value)}
@@ -141,6 +165,20 @@ const Scene = ({ onSceneReady }) => {
           <option value="physics">Physics Scene</option>
           <option value="proximity">Proximity Scene</option>
         </select>
+
+        <button
+          onClick={addRandomPrimitive}
+          style={{
+            padding: '8px',
+            borderRadius: '4px',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            border: '1px solid #444',
+            cursor: 'pointer',
+          }}
+        >
+          Add Random Shape
+        </button>
       </div>
     </div>
   )
