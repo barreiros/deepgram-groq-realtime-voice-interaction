@@ -39,7 +39,7 @@ Ensure you have the following installed:
    ```
 2. **Run the application:**
    ```bash
-   npm run dev
+   GEMINI_API_KEY=[YOUR GEMINI KEY] npm run dev
    ```
 
 ## 🏗️ Technological Stack
