@@ -1,38 +1,42 @@
-import { AudioRecorder } from '../../audio/AudioRecorder.js'
-
 export class AudioRecordingService {
   constructor(socket) {
     this.socket = socket
-    this.audioRecorder = null
+    this.mediaRecorder = null
     this.isRecording = false
     this.onVolumeChange = null
     this.onStatusChange = null
+    this.stream = null
   }
 
   async startRecording() {
     try {
-      if (!this.audioRecorder) {
-        this.audioRecorder = new AudioRecorder(16000)
-
-        this.audioRecorder.on('data', (audioData) => {
-          if (this.isRecording) {
-            this.sendAudioData(audioData)
-          }
-        })
-
-        this.audioRecorder.on('volume', (volume) => {
-          if (this.onVolumeChange) {
-            this.onVolumeChange(volume)
-          }
-        })
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('MediaDevices API not available')
       }
 
-      await this.audioRecorder.start()
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.mediaRecorder = new window.MediaRecorder(this.stream)
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && this.isRecording) {
+          this.sendAudioData(event.data)
+        }
+      }
+
+      this.mediaRecorder.onstart = () => {
+        if (this.onStatusChange) {
+          this.onStatusChange('Recording... Speak now')
+        }
+      }
+
+      this.mediaRecorder.onstop = () => {
+        if (this.onStatusChange) {
+          this.onStatusChange('Recording stopped')
+        }
+      }
+
+      this.mediaRecorder.start(250)
       this.isRecording = true
-
-      if (this.onStatusChange) {
-        this.onStatusChange('Recording... Speak now')
-      }
 
       return true
     } catch (error) {
@@ -45,10 +49,13 @@ export class AudioRecordingService {
   }
 
   stopRecording() {
-    if (this.audioRecorder && this.isRecording) {
-      this.audioRecorder.stop()
+    if (this.mediaRecorder && this.isRecording) {
+      this.mediaRecorder.stop()
       this.isRecording = false
-
+      if (this.stream) {
+        this.stream.getTracks().forEach((track) => track.stop())
+        this.stream = null
+      }
       if (this.onStatusChange) {
         this.onStatusChange('Recording stopped')
       }
@@ -59,18 +66,7 @@ export class AudioRecordingService {
     if (!this.socket) return
 
     try {
-      const audioMessage = {
-        realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType: 'audio/pcm;rate=16000',
-              data: audioData,
-            },
-          ],
-        },
-      }
-
-      this.socket.sendMessage(audioMessage)
+      this.socket.sendAudioData(audioData)
     } catch (error) {
       console.error('Error sending audio data:', error)
     }

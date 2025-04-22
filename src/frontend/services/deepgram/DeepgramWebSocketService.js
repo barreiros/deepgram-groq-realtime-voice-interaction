@@ -8,7 +8,11 @@ class DeepgramWebSocketService extends BaseWebSocketService {
 
   sendAudioData(data) {
     // data should be raw audio (ArrayBuffer or Blob)
-    this.sendMessage(data)
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(data)
+    } else {
+      console.error('WebSocket not ready. State:', this.ws?.readyState)
+    }
   }
 }
 

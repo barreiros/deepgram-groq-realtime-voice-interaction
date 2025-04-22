@@ -67,7 +67,7 @@ wss.on('connection', (ws) => {
       //   'length:',
       //   message?.length
       // )
-      deepgramService.handleClientMessage(deepgramWs, message)
+      deepgramService.handleClientMessage(deepgramWs, message, ws)
     } catch (error) {
       console.error('Error processing message:', error)
       ws.send(
@@ -82,7 +82,7 @@ wss.on('connection', (ws) => {
     if (deepgramWs) {
       console.log('Closing Deepgram connection')
       deepgramWs.removeAllListeners()
-      deepgramWs.close()
+      deepgramWs.finish()
     }
   })
 })
