@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Scene from './Scene'
-import GeminiWebSocketService from '../services/gemini/GeminiWebSocketService'
+import DeepgramWebSocketService from '../services/deepgram/DeepgramWebSocketService'
 import { AudioRecordingService } from '../services/audio/AudioRecordingService'
 import AudioPlaybackService from '../services/audio/AudioPlaybackService'
 
@@ -20,7 +20,7 @@ export default function App() {
 
   useEffect(() => {
     if (!ws.current) {
-      ws.current = new GeminiWebSocketService({
+      ws.current = new DeepgramWebSocketService({
         onMessage: handleWebSocketMessage,
       })
     }

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is a full-stack application that integrates Three.js for 3D rendering with real-time WebSocket communication and AI services. It features audio-to-audio communication through Gemini's multimodal API, with an architecture designed to support multiple AI service providers.
+This project is a full-stack application that integrates Three.js for 3D rendering with real-time WebSocket communication and AI services. It features audio-to-text communication through Deepgram's speech-to-text API, with an architecture designed to support multiple AI service providers.
 
 ## Technology Stack
 
@@ -21,7 +21,7 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 - **Node.js**: JavaScript runtime for server-side code
 - **Express.js**: Web application framework for Node.js
 - **WebSocket Server**: Using the 'ws' library for WebSocket functionality
-- **Gemini API**: Google's multimodal AI service for audio processing
+- **Deepgram API**: Speech-to-text AI service for audio processing
 - **AI Service Abstraction**: Architecture supporting multiple AI providers
 
 ## Project Structure
@@ -46,13 +46,13 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 │   │   │   └── Scene.jsx    # Three.js scene
 │   │   └── services/   # Frontend services
 │   │       ├── audio/       # Audio services
-│   │       ├── gemini/      # Gemini integration
+│   │       ├── deepgram/    # Deepgram integration
 │   │       └── websocket/   # WebSocket base service
 │   └── backend/        # Backend code
 │       ├── server.js   # Express server
 │       ├── assistants/ # AI assistants configuration
 │       └── services/   # Backend services
-│           └── gemini/ # Gemini service implementation
+│           └── deepgram/ # Deepgram service implementation
 ```
 
 ## Features
@@ -60,7 +60,7 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 1. **React Components**: Modular component architecture
 2. **3D Visualization**: Interactive Three.js scene
 3. **Real-time Audio**: Browser-based audio recording and playback
-4. **AI Integration**: Gemini multimodal API with support for multiple providers
+4. **AI Integration**: Deepgram speech-to-text API with support for multiple providers
 5. **Multiple Assistants**: Configurable AI assistants for different use cases
 6. **Responsive Design**: Adapts to different screen sizes
 
@@ -79,14 +79,14 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 1. Client browser records audio using Web Audio API
 2. Audio is processed through Audio Worklets
 3. Processed audio is sent to backend via WebSocket
-4. Backend forwards audio to Gemini API
-5. Gemini's response audio is sent back to client
-6. Client plays received audio through Audio Playback Service
+4. Backend forwards audio to Deepgram API
+5. Deepgram's transcription is sent back to client
+6. Client displays or processes received transcription
 
 ### AI Service Architecture
 
 1. **Base Service Interface**: Common interface for all AI providers
-2. **Provider-Specific Services**: Implementations for each AI service (Gemini, future OpenAI, etc.)
+2. **Provider-Specific Services**: Implementations for each AI service (Deepgram, future OpenAI, etc.)
 3. **Assistant Configuration**: JSON-based configuration for different AI personas
 4. **Service Factory**: Dynamic provider selection based on configuration
 

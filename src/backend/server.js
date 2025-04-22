@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import dotenv from 'dotenv'
 
-import GeminiService from './services/gemini/GeminiService.js'
+import DeepgramService from './services/deepgram/DeepgramService.js'
 
 // Load environment variables from .env file
 dotenv.config()
@@ -26,15 +26,15 @@ const server = http.createServer(app)
 const wss = new WebSocketServer({ server })
 
 // Get API key from environment variables
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
 
-if (!GEMINI_API_KEY) {
-  console.error('GEMINI_API_KEY environment variable is not set!')
+if (!DEEPGRAM_API_KEY) {
+  console.error('DEEPGRAM_API_KEY environment variable is not set!')
   process.exit(1)
 }
 
-// Initialize Gemini service
-const geminiService = new GeminiService(GEMINI_API_KEY)
+// Initialize Deepgram service
+const deepgramService = new DeepgramService(DEEPGRAM_API_KEY)
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '../../public')))
@@ -44,19 +44,11 @@ app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running' })
 })
 
-// WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket')
 
-  // Initialize Gemini connection
-  const geminiWs = geminiService.createWebSocket(ws)
-
-  // Send setup config once Gemini connection is established
-  if (geminiWs.readyState !== WebSocket.OPEN) {
-    geminiWs.pendingSetup = geminiService.getSetupConfig()
-  } else {
-    geminiWs.send(JSON.stringify(geminiService.getSetupConfig()))
-  }
+  // Initialize Deepgram connection
+  const deepgramWs = deepgramService.createWebSocket(ws)
 
   // Send a welcome message to the client
   ws.send(
@@ -66,10 +58,16 @@ wss.on('connection', (ws) => {
     })
   )
 
-  // Handle messages from client
+  // Handle messages from client (audio binary)
   ws.on('message', (message) => {
     try {
-      geminiService.handleClientMessage(geminiWs, message)
+      // console.log(
+      //   'Received message from client, type:',
+      //   typeof message,
+      //   'length:',
+      //   message?.length
+      // )
+      deepgramService.handleClientMessage(deepgramWs, message)
     } catch (error) {
       console.error('Error processing message:', error)
       ws.send(
@@ -81,10 +79,10 @@ wss.on('connection', (ws) => {
   // Handle client disconnection
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket')
-    if (geminiWs) {
-      console.log('Closing Gemini connection')
-      geminiWs.removeAllListeners()
-      geminiWs.close()
+    if (deepgramWs) {
+      console.log('Closing Deepgram connection')
+      deepgramWs.removeAllListeners()
+      deepgramWs.close()
     }
   })
 })
