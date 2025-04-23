@@ -1,13 +1,12 @@
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
-import GroqService from './../groq/GroqService.js'
 
 let keepAlive = null
 
 export class DeepgramService {
-  constructor(apiKey) {
+  constructor(apiKey, groqService) {
     this.apiKey = apiKey
     this.dgClient = createClient(this.apiKey)
-    this.groqService = new GroqService()
+    this.groqService = groqService // Accept GroqService instance
     console.log('DeepgramService instantiated with API key:', !!this.apiKey)
   }
 
@@ -99,6 +98,36 @@ export class DeepgramService {
     })
 
     return deepgram
+  }
+
+  async synthesizeSpeech(text, ws) {
+    try {
+      console.log('DeepgramService.synthesizeSpeech called with text:', text)
+      const response = await this.dgClient.speak.request(
+        { text },
+        {
+          model: 'aura-angus-en', // Or another suitable voice
+          encoding: 'linear16', // Or 'mp3', 'aac', etc.
+          container: 'wav', // Or 'mp3', 'aac', etc.
+        }
+      )
+
+      const stream = await response.getStream()
+      const chunks = []
+      for await (const chunk of stream) {
+        chunks.push(chunk)
+      }
+      const data = Buffer.concat(chunks)
+
+      console.log('DeepgramService.synthesizeSpeech received audio data')
+      // Send the audio data back to the client
+      ws.send(data)
+    } catch (error) {
+      console.error('Error synthesizing speech with Deepgram:', error)
+      console.error('Deepgram TTS Error Details:', error) // Log the full error object
+      // Optionally send an error message back to the client
+      ws.send(JSON.stringify({ error: 'Error synthesizing speech' }))
+    }
   }
 
   handleClientMessage(deepgram, message, ws) {

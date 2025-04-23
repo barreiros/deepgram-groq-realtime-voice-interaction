@@ -3,127 +3,23 @@ class AudioPlaybackService {
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
     this.audioQueue = []
     this.isPlaying = false
-    this.currentWordBuffer = []
-    this.silenceThreshold = 0.01
-    this.silenceFrames = 0
-    this.minSilenceFrames = 100
   }
 
-  async playAudio(audioData, mimeType = 'audio/pcm;rate=24000') {
+  async playAudio(audioBlob) {
     try {
-      if (!audioData || !audioData.length) {
-        console.error('Invalid audio data')
+      if (!audioBlob || !(audioBlob instanceof Blob)) {
+        console.error('Invalid audio data: Expected a Blob')
         return
       }
 
-      const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1]) || 24000
+      // Decode the audio data from the Blob
+      const arrayBuffer = await audioBlob.arrayBuffer()
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer)
 
-      const floatArray = await this.decodeAudioData(audioData)
-      const processedBuffer = await this.processAudioChunk(
-        floatArray,
-        sampleRate
-      )
-
-      if (processedBuffer) {
-        this.addToAudioQueue(processedBuffer)
-      }
+      this.addToAudioQueue(audioBuffer)
     } catch (error) {
-      console.error('Error processing audio:', error)
+      console.error('Error processing audio blob:', error)
     }
-  }
-
-  async decodeAudioData(audioData) {
-    const binaryString = atob(audioData)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    const audioData16bit = new Int16Array(bytes.buffer)
-    const floatArray = new Float32Array(audioData16bit.length)
-    for (let i = 0; i < audioData16bit.length; i++) {
-      floatArray[i] = audioData16bit[i] / 32768.0
-    }
-    return floatArray
-  }
-
-  async processAudioChunk(floatArray, sampleRate) {
-    this.currentWordBuffer.push(floatArray)
-
-    // Check for silence at the end of the chunk
-    let silenceDetected = false
-    for (
-      let i = Math.max(0, floatArray.length - 100);
-      i < floatArray.length;
-      i++
-    ) {
-      if (Math.abs(floatArray[i]) < this.silenceThreshold) {
-        this.silenceFrames++
-        if (this.silenceFrames >= this.minSilenceFrames) {
-          silenceDetected = true
-          break
-        }
-      } else {
-        this.silenceFrames = 0
-      }
-    }
-
-    if (silenceDetected && this.currentWordBuffer.length > 0) {
-      // Combine all chunks in the word buffer
-      const totalLength = this.currentWordBuffer.reduce(
-        (sum, chunk) => sum + chunk.length,
-        0
-      )
-      const combinedArray = new Float32Array(totalLength)
-      let offset = 0
-
-      for (const chunk of this.currentWordBuffer) {
-        combinedArray.set(chunk, offset)
-        offset += chunk.length
-      }
-
-      this.currentWordBuffer = []
-      this.silenceFrames = 0
-
-      // Resample if needed
-      if (this.audioContext.sampleRate !== sampleRate) {
-        return await this.resampleAudio(combinedArray, sampleRate)
-      } else {
-        const audioBuffer = this.audioContext.createBuffer(
-          1,
-          combinedArray.length,
-          sampleRate
-        )
-        audioBuffer.getChannelData(0).set(combinedArray)
-        return audioBuffer
-      }
-    }
-
-    return null
-  }
-
-  async resampleAudio(floatArray, originalSampleRate) {
-    const offlineCtx = new OfflineAudioContext(
-      1, // mono
-      Math.ceil(
-        (floatArray.length * this.audioContext.sampleRate) / originalSampleRate
-      ),
-      this.audioContext.sampleRate
-    )
-
-    const originalBuffer = offlineCtx.createBuffer(
-      1,
-      floatArray.length,
-      originalSampleRate
-    )
-    originalBuffer.getChannelData(0).set(floatArray)
-
-    const source = offlineCtx.createBufferSource()
-    source.buffer = originalBuffer
-    source.connect(offlineCtx.destination)
-    source.start()
-
-    return await offlineCtx.startRendering()
   }
 
   addToAudioQueue(audioBuffer) {

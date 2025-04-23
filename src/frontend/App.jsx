@@ -36,6 +36,15 @@ export default function App() {
 
   const handleWebSocketMessage = (data) => {
     try {
+      // Check if the data is a binary blob (likely audio data)
+      if (data instanceof Blob) {
+        console.log('Received audio blob from WebSocket')
+        // Assuming the audio data is in a playable format (e.g., WAV)
+        audioPlayback.current.playAudio(data)
+        return // Stop processing if it's audio data
+      }
+
+      // Otherwise, process as JSON
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data
       setMessages((prev) => [...prev, { type: 'received', text: parsedData }])
 
@@ -63,6 +72,7 @@ export default function App() {
         }
       }
 
+      // This part might not be needed anymore if audio comes as raw blobs
       if (parsedData.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
         const inlineData =
           parsedData.serverContent.modelTurn.parts[0].inlineData

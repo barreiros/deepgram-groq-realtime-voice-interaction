@@ -1,6 +1,7 @@
 import { ChatGroq } from '@langchain/groq'
 import { ChatPromptTemplate } from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
+import { DeepgramService } from './../deepgram/DeepgramService.js' // Import DeepgramService
 
 class GroqService {
   constructor() {
@@ -14,6 +15,7 @@ class GroqService {
     ])
     this.outputParser = new StringOutputParser()
     this.chain = this.prompt.pipe(this.model).pipe(this.outputParser)
+    this.deepgramService = new DeepgramService(process.env.DEEPGRAM_API_KEY) // Instantiate DeepgramService
   }
 
   async processTranscription(transcription, ws) {
@@ -40,6 +42,9 @@ class GroqService {
           // Send complete sentence to client (optional, can be removed if only chunks are needed)
           ws.send(JSON.stringify({ groqSentence: completeSentence }))
 
+          // Call DeepgramService to synthesize speech
+          await this.deepgramService.synthesizeSpeech(completeSentence, ws)
+
           buffer = buffer.substring(sentenceEndIndex + 1).trimStart()
           sentenceEndIndex = buffer.search(sentenceEndings)
         }
@@ -53,6 +58,9 @@ class GroqService {
 
         // Send final sentence to client (optional)
         ws.send(JSON.stringify({ groqSentence: finalSentence }))
+
+        // Call DeepgramService to synthesize speech for the final sentence
+        await this.deepgramService.synthesizeSpeech(finalSentence, ws)
       }
 
       // Return the full accumulated result (optional, depending on need)

@@ -7,9 +7,28 @@ import { dirname } from 'path'
 import dotenv from 'dotenv'
 
 import DeepgramService from './services/deepgram/DeepgramService.js'
+import GroqService from './services/groq/GroqService.js' // Import GroqService
 
 // Load environment variables from .env file
 dotenv.config()
+
+// Get API key from environment variables
+const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
+const GROQ_API_KEY = process.env.GROQ_API_KEY // Get Groq API key
+
+if (!DEEPGRAM_API_KEY) {
+  console.error('DEEPGRAM_API_KEY environment variable is not set!')
+  process.exit(1)
+}
+
+if (!GROQ_API_KEY) {
+  console.error('GROQ_API_KEY environment variable is not set!')
+  process.exit(1)
+}
+
+// Initialize Deepgram and Groq services
+const groqService = new GroqService(GROQ_API_KEY) // Instantiate GroqService
+const deepgramService = new DeepgramService(DEEPGRAM_API_KEY, groqService) // Instantiate DeepgramService and pass GroqService
 
 // Get directory name in ESM
 const __filename = fileURLToPath(import.meta.url)
@@ -24,17 +43,6 @@ const server = http.createServer(app)
 
 // Create WebSocket server
 const wss = new WebSocketServer({ server })
-
-// Get API key from environment variables
-const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
-
-if (!DEEPGRAM_API_KEY) {
-  console.error('DEEPGRAM_API_KEY environment variable is not set!')
-  process.exit(1)
-}
-
-// Initialize Deepgram service
-const deepgramService = new DeepgramService(DEEPGRAM_API_KEY)
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '../../public')))
