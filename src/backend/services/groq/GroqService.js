@@ -21,15 +21,46 @@ class GroqService {
       const response = await this.chain.stream({
         input: transcription,
       })
-      let result = ''
+      let buffer = ''
       for await (const item of response) {
-        result += item
-        // Send each stream item back to the client
-        ws.send(JSON.stringify({ groqStreamChunk: item }))
+        buffer += item
+        // Send each stream item back to the client (optional, can be removed if only full sentences are needed on client)
+
+        // Check for sentence endings
+        const sentenceEndings = /[.!?]/
+        let sentenceEndIndex = buffer.search(sentenceEndings)
+
+        while (sentenceEndIndex !== -1) {
+          const completeSentence = buffer
+            .substring(0, sentenceEndIndex + 1)
+            .trim()
+          console.log('Complete Sentence:', completeSentence)
+          // TODO: Process or send the complete sentence to another service/client
+
+          // Send complete sentence to client (optional, can be removed if only chunks are needed)
+          ws.send(JSON.stringify({ groqSentence: completeSentence }))
+
+          buffer = buffer.substring(sentenceEndIndex + 1).trimStart()
+          sentenceEndIndex = buffer.search(sentenceEndings)
+        }
       }
-      // Optionally, send a final message when the stream is complete
-      // ws.send(JSON.stringify({ groqStreamComplete: true, finalResult: result }));
-      return result
+
+      // Process any remaining text in the buffer as a final sentence
+      if (buffer.length > 0) {
+        const finalSentence = buffer.trim()
+        console.log('Final Sentence (stream ended):', finalSentence)
+        // TODO: Process or send the final sentence to another service/client
+
+        // Send final sentence to client (optional)
+        ws.send(JSON.stringify({ groqSentence: finalSentence }))
+      }
+
+      // Return the full accumulated result (optional, depending on need)
+      // Note: This 'result' is not used for streaming sentences, but holds the full text.
+      // If you only need sentences, you might not need to accumulate the full result here.
+      // let fullResult = ''; // If you need the full result, accumulate it here
+      // return fullResult;
+      return '' // Returning empty string as sentences are handled within the loop
     } catch (error) {
       console.error('Error processing transcription with Groq:', error)
       throw error
