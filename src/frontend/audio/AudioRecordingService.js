@@ -11,7 +11,7 @@ export class AudioRecordingService {
     this.source = null
     this.isAudible = false // Flag to track if sound is detected
     this.analysisInterval = null // Interval ID for analysis loop
-    this.silenceThreshold = 5 // Threshold for detecting silence (adjust as needed)
+    this.silenceThreshold = 8 // Increased threshold to make filter less sensitive
     this.initialChunkSent = false // Flag to ensure the first chunk is always sent
   }
 
