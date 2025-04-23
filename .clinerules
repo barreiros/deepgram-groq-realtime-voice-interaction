@@ -14,7 +14,6 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 - **Three.js**: JavaScript 3D library for creating and displaying animated 3D computer graphics
 - **WebSocket Client**: Native WebSocket API for real-time communication
 - **Web Audio API**: For audio recording and playback
-- **Audio Worklets**: For real-time audio processing
 
 ### Backend
 
@@ -36,17 +35,22 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 │   │   ├── index.html  # Main HTML file
 │   │   ├── style.css   # CSS styles
 │   │   ├── main.jsx    # React entry point
-│   │   ├── audio/      # Audio processing
-│   │   │   ├── EventEmitter.js
-│   │   │   ├── utils.js
-│   │   │   └── worklets/    # Audio processing worklets
+│   │   ├── audio/      # Audio services (no worklets)
+│   │   │   ├── AudioPlaybackService.js
+│   │   │   └── AudioRecordingService.js
+│   │   ├── App.jsx      # App component (root entry)
 │   │   ├── components/ # React components
-│   │   │   ├── App.jsx      # Root component
-│   │   │   └── Scene.jsx    # Three.js scene
+│   │   │   ├── Scene.jsx    # Three.js scene
 │   │   └── services/   # Frontend services
-│   │       ├── audio/       # Audio services
 │   │       ├── deepgram/    # Deepgram integration
+│   │       │   └── DeepgramWebSocketService.js
+│   │       ├── three/       # Three.js services
+│   │       │   ├── PhysicsEngine.js
+│   │       │   ├── PrimitiveFactory.js
+│   │       │   ├── ProximityScene.js
+│   │       │   └── ThreeScene.js
 │   │       └── websocket/   # WebSocket base service
+│   │           └── BaseWebSocketService.js
 │   └── backend/        # Backend code
 │       ├── server.js   # Express server
 │       └── services/   # Backend services
@@ -57,7 +61,7 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 
 1. **React Components**: Modular component architecture
 2. **3D Visualization**: Interactive Three.js scene
-3. **Real-time Audio**: Browser-based audio recording and playback
+3. **Real-time Audio**: Browser-based audio recording and playback (no worklets)
 4. **AI Integration**: Deepgram speech-to-text API with streaming audio and real-time transcription
 5. **Responsive Design**: Adapts to different screen sizes
 
@@ -74,11 +78,10 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 ### Audio Communication Flow
 
 1. Client browser records audio using Web Audio API
-2. Audio is processed through Audio Worklets
-3. Processed audio is sent to backend via WebSocket
-4. Backend forwards audio to Deepgram API
-5. Deepgram's transcription is sent back to client
-6. Client displays or processes received transcription
+2. Audio is sent to backend via WebSocket (no worklet processing)
+3. Backend forwards audio to Deepgram API
+4. Deepgram's transcription is sent back to client
+5. Client displays or processes received transcription
 
 ### AI Service Architecture
 

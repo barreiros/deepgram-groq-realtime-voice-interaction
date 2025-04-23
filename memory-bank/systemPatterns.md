@@ -23,7 +23,7 @@
 
 ## Component Relationships
 
-- App.jsx manages UI and WebSocket connection.
-- AudioRecordingService manages MediaRecorder and streams audio to DeepgramWebSocketService.
+- Scene.jsx is the main Three.js scene component.
+- AudioRecordingService and AudioPlaybackService in audio/ handle recording and playback using Web Audio API (no worklets).
 - DeepgramWebSocketService handles direct binary WebSocket communication.
 - Backend proxies audio to Deepgram and returns transcripts.

@@ -4,6 +4,8 @@
 
 - Real-time audio recording in browser using MediaRecorder.
 - Audio Blobs sent directly to backend via WebSocket (no JSON).
+- Audio folder now only contains AudioRecordingService.js and AudioPlaybackService.js (no worklets).
+- App component is present in src/frontend/App.jsx and is the root entry; Scene.jsx is main Three.js component.
 - Backend proxies audio to Deepgram using official SDK.
 - Deepgram transcriptions received and displayed in frontend.
 - Robust connection management and error handling.
