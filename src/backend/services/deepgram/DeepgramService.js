@@ -1,4 +1,5 @@
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
+import GroqService from './../groq/GroqService.js'
 
 let keepAlive = null
 
@@ -6,6 +7,7 @@ export class DeepgramService {
   constructor(apiKey) {
     this.apiKey = apiKey
     this.dgClient = createClient(this.apiKey)
+    this.groqService = new GroqService()
     console.log('DeepgramService instantiated with API key:', !!this.apiKey)
   }
 
@@ -46,11 +48,30 @@ export class DeepgramService {
     deepgram.addListener(LiveTranscriptionEvents.Open, async () => {
       console.log('deepgram: connected')
 
-      deepgram.addListener(LiveTranscriptionEvents.Transcript, (data) => {
+      deepgram.addListener(LiveTranscriptionEvents.Transcript, async (data) => {
         console.log('deepgram: packet received', data)
         console.log('deepgram: transcript received')
         console.log('socket: transcript sent to client')
-        ws.send(JSON.stringify(data))
+
+        // Process the transcription with Groq
+        if (data.channel.alternatives[0]?.transcript) {
+          const transcription = data.channel.alternatives[0].transcript
+          console.log('Processing transcription with Groq:', transcription)
+          try {
+            // Process the transcription with Groq
+            const groqResponse = await this.groqService.processTranscription(
+              transcription,
+              ws
+            )
+            console.log(
+              'Groq Processing Complete. Final Response:',
+              groqResponse
+            )
+            // The Groq response is streamed back to the client from GroqService
+          } catch (error) {
+            console.error('Error processing transcription with Groq:', error)
+          }
+        }
       })
 
       deepgram.addListener(LiveTranscriptionEvents.Close, async () => {
