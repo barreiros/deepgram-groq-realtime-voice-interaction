@@ -9,6 +9,7 @@
 - Backend proxies audio to Deepgram using official SDK.
 - Deepgram transcriptions received and displayed in frontend.
 - Robust connection management and error handling.
+- Groq integration implemented for processing transcriptions and streaming complete sentences.
 - All Gemini code fully removed.
 
 ## What's Left to Build

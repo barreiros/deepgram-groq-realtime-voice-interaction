@@ -13,6 +13,8 @@
   - Express.js (web server)
   - ws (WebSocket server)
   - @deepgram/sdk (Deepgram streaming API)
+  - Groq API (AI service)
+  - LangChain (AI framework)
 
 ## Development Setup
 
@@ -32,6 +34,8 @@
 ## Dependencies
 
 - @deepgram/sdk
+- groq-sdk
+- @langchain/groq
 - ws
 - express
 - react

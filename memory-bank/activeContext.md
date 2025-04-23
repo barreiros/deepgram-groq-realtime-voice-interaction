@@ -13,6 +13,7 @@
 - Audio worklet classes and related files removed.
 - App.jsx is present in src/frontend and is the root entry; Scene.jsx is the main Three.js component.
 - Audio services updated to use only Web Audio API and MediaRecorder.
+- Groq integration implemented in the backend to process Deepgram transcriptions using LangChain and stream complete sentences to the client.
 - .clinerules and memory bank updated to reflect new architecture and lessons learned.
 
 ## Next Steps

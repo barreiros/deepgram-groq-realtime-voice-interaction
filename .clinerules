@@ -86,9 +86,16 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 ### AI Service Architecture
 
 1. **Base Service Interface**: Common interface for all AI providers
-2. **Provider-Specific Services**: Implementations for each AI service (Deepgram, future OpenAI, etc.)
+2. **Provider-Specific Services**: Implementations for each AI service (Deepgram, Groq, future OpenAI, etc.)
 3. **Assistant Configuration**: JSON-based configuration for different AI personas
 4. **Service Factory**: Dynamic provider selection based on configuration
+
+## Groq Integration
+
+- **GroqService**: Backend service (`src/backend/services/groq/GroqService.js`) for interacting with the Groq API via LangChain.
+- **LangChain**: Used in `GroqService` to build the chain for processing text with the Groq model.
+- **Sentence Streaming**: The `GroqService` processes the Groq stream and sends complete sentences (identified by punctuation) back to the client via WebSocket, rather than individual chunks.
+- **Model**: Configured to use the 'llama3-8b-8192' Groq model.
 
 ## Very very important
 
