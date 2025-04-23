@@ -37,7 +37,6 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 │   │   ├── style.css   # CSS styles
 │   │   ├── main.jsx    # React entry point
 │   │   ├── audio/      # Audio processing
-│   │   │   ├── AudioRecorder.js
 │   │   │   ├── EventEmitter.js
 │   │   │   ├── utils.js
 │   │   │   └── worklets/    # Audio processing worklets
@@ -50,7 +49,6 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 │   │       └── websocket/   # WebSocket base service
 │   └── backend/        # Backend code
 │       ├── server.js   # Express server
-│       ├── assistants/ # AI assistants configuration
 │       └── services/   # Backend services
 │           └── deepgram/ # Deepgram service implementation
 ```
@@ -60,9 +58,8 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 1. **React Components**: Modular component architecture
 2. **3D Visualization**: Interactive Three.js scene
 3. **Real-time Audio**: Browser-based audio recording and playback
-4. **AI Integration**: Deepgram speech-to-text API with support for multiple providers
-5. **Multiple Assistants**: Configurable AI assistants for different use cases
-6. **Responsive Design**: Adapts to different screen sizes
+4. **AI Integration**: Deepgram speech-to-text API with streaming audio and real-time transcription
+5. **Responsive Design**: Adapts to different screen sizes
 
 ## Implementation Details
 

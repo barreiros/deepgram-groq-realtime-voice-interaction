@@ -1,0 +1,28 @@
+# Progress
+
+## What Works
+
+- Real-time audio recording in browser using MediaRecorder.
+- Audio Blobs sent directly to backend via WebSocket (no JSON).
+- Backend proxies audio to Deepgram using official SDK.
+- Deepgram transcriptions received and displayed in frontend.
+- Robust connection management and error handling.
+- All Gemini code fully removed.
+
+## What's Left to Build
+
+- UI/UX improvements for displaying and interacting with transcriptions.
+- Additional AI provider support (future).
+- More comprehensive testing (edge cases, error states).
+- Deployment and scaling documentation.
+
+## Current Status
+
+- Deepgram streaming integration is stable and production-ready.
+- All audio and transcript flows are event-driven and robust.
+- Project documentation and memory bank are up to date.
+
+## Known Issues
+
+- No major issues at this time.
+- Further testing needed for rare browser/connection edge cases.
