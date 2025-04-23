@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import Scene from './Scene'
-import DeepgramWebSocketService from '../services/deepgram/DeepgramWebSocketService'
-import { AudioRecordingService } from '../services/audio/AudioRecordingService'
-import AudioPlaybackService from '../services/audio/AudioPlaybackService'
+import Scene from './components/Scene'
+import DeepgramWebSocketService from './services/deepgram/DeepgramWebSocketService'
+import { AudioRecordingService } from './audio/AudioRecordingService'
+import AudioPlaybackService from './audio/AudioPlaybackService'
 
 export default function App() {
   const [messages, setMessages] = useState([])
