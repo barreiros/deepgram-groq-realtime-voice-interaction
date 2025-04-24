@@ -36,6 +36,7 @@
 - @deepgram/sdk
 - groq-sdk
 - @langchain/groq
+- langchain
 - ws
 - express
 - react

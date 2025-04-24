@@ -93,9 +93,12 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 ## Groq Integration
 
 - **GroqService**: Backend service (`src/backend/services/groq/GroqService.js`) for interacting with the Groq API via LangChain.
-- **LangChain**: Used in `GroqService` to build the chain for processing text with the Groq model.
+- **LangChain**: Used in `GroqService` to build the chain for processing text with the Groq models and managing short-term memory.
 - **Sentence Streaming**: The `GroqService` processes the Groq stream and sends complete sentences (identified by punctuation) back to the client via WebSocket, rather than individual chunks.
-- **Model**: Configured to use the 'llama3-8b-8192' Groq model.
+- **Models**:
+  - Chat: `meta-llama/llama-4-maverick-17b-128e-instruct`
+  - Memory Summarization: `llama3-8b-8192`
+- **Short-term Memory**: Implemented using Langchain's `ConversationSummaryBufferMemory` to maintain conversation context.
 
 ## Very very important
 

@@ -13,7 +13,8 @@
 - Audio worklet classes and related files removed.
 - App.jsx is present in src/frontend and is the root entry; Scene.jsx is the main Three.js component.
 - Audio services updated to use only Web Audio API and MediaRecorder.
-- Groq integration implemented in the backend to process Deepgram transcriptions using LangChain and stream complete sentences to the client.
+- Groq integration implemented in the backend to process Deepgram transcriptions using LangChain and stream complete sentences to the client, using the `meta-llama/llama-4-maverick-17b-128e-instruct` model for chat.
+- Short-term memory added to the GroqService using Langchain's ConversationSummaryBufferMemory and the `llama3-8b-8192` model for summarization. The prompt structure has been corrected to use `MessagesPlaceholder` for chat history.
 - .clinerules and memory bank updated to reflect new architecture and lessons learned.
 
 ## Next Steps

@@ -4,7 +4,7 @@
 
 - **Frontend**: React + Vite + Tailwind CSS, modular component structure, MediaRecorder for audio capture, WebSocket for real-time communication.
 - **Backend**: Node.js + Express, WebSocket server, Deepgram SDK for live transcription.
-- **AI Integration**: Deepgram streaming API for speech-to-text, Groq integration for processing transcriptions and streaming sentences, designed for easy extension to other AI providers.
+- **AI Integration**: Deepgram streaming API for speech-to-text, Groq integration for processing transcriptions and streaming sentences using the `meta-llama/llama-4-maverick-17b-128e-instruct` model for chat and `llama3-8b-8192` for memory summarization, with short-term memory implemented using Langchain's ConversationSummaryBufferMemory, designed for easy extension to other AI providers.
 
 ## Key Technical Decisions
 

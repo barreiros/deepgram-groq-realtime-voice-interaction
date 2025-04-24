@@ -10,6 +10,7 @@
 - Deepgram transcriptions received and displayed in frontend.
 - Robust connection management and error handling.
 - Groq integration implemented for processing transcriptions and streaming complete sentences.
+- Short-term memory implemented in the GroqService using Langchain's ConversationSummaryBufferMemory with the `llama3-8b-8192` model for summarization. The prompt structure has been corrected to use `MessagesPlaceholder` for chat history.
 - All Gemini code fully removed.
 
 ## What's Left to Build
