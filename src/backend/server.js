@@ -2,9 +2,11 @@ import express from 'express'
 import { WebSocketServer, WebSocket } from 'ws'
 import http from 'http'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import dotenv from 'dotenv'
+import { writeWavFile } from './wavConversor.js'
 
 import DeepgramService from './services/deepgram/DeepgramService.js'
 import GroqService from './services/groq/GroqService.js' // Import GroqService
@@ -66,15 +68,22 @@ wss.on('connection', (ws) => {
     })
   )
 
-  // Handle messages from client (audio binary)
   ws.on('message', (message) => {
     try {
-      // console.log(
-      //   'Received message from client, type:',
-      //   typeof message,
-      //   'length:',
-      //   message?.length
-      // )
+      const timestamp = Date.now()
+      const recordingsDir = path.join(__dirname, 'recordings')
+      const wavPath = path.join(recordingsDir, `audio-${timestamp}.wav`)
+
+      // ✅ Ensure the directory exists
+      if (!fs.existsSync(recordingsDir)) {
+        fs.mkdirSync(recordingsDir, { recursive: true })
+      }
+
+      // ✅ Save audio as proper WAV
+      writeWavFile(message, wavPath)
+      console.log(`Saved audio buffer as WAV to ${wavPath}`)
+
+      // Send to Deepgram
       deepgramService.handleClientMessage(deepgramWs, message, ws)
     } catch (error) {
       console.error('Error processing message:', error)

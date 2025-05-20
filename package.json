@@ -28,6 +28,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "langchain": "^0.3.23",
+    "node-wav": "^0.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.174.0",
