@@ -55,6 +55,7 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 │       ├── server.js   # Express server
 │       └── services/   # Backend services
 │           └── deepgram/ # Deepgram service implementation
+│           └── groq/ # Groq service implementation
 ```
 
 ## Features
@@ -89,6 +90,25 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 2. **Provider-Specific Services**: Implementations for each AI service (Deepgram, Groq, future OpenAI, etc.)
 3. **Assistant Configuration**: JSON-based configuration for different AI personas
 4. **Service Factory**: Dynamic provider selection based on configuration
+
+## Event-Based Service Communication
+
+The project now implements an event-based communication system between services:
+
+1. **EventEmitter Integration**: Each service instance receives its own EventEmitter
+2. **Service Isolation**: Separate instances of GroqService and DeepgramService are created for each WebSocket connection
+3. **Event Types**:
+   - `transcription`: For sending transcription data
+   - `llm-text`: For sending processed text from LLM
+   - `speech`: For sending synthesized speech audio
+   - `error`: For error handling
+   - `metadata`: For metadata transmission
+
+## Service Lifecycle
+
+1. **Connection Establishment**: Services are instantiated per WebSocket connection
+2. **Event Binding**: Services bind to relevant events during initialization
+3. **Cleanup**: Services properly clean up resources on connection close
 
 ## Groq Integration
 
