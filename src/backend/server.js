@@ -2,19 +2,14 @@ import express from 'express'
 import { WebSocketServer, WebSocket } from 'ws'
 import http from 'http'
 import path from 'path'
-import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import dotenv from 'dotenv'
-import { writeWavFile } from './wavConversor.js'
+import DeepgramService from './services/DeepgramService.js'
+import GroqService from './services/GroqService.js'
 
-import DeepgramService from './services/deepgram/DeepgramService.js'
-import GroqService from './services/groq/GroqService.js' // Import GroqService
-
-// Load environment variables from .env file
 dotenv.config()
 
-// Get API key from environment variables
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
 const GROQ_API_KEY = process.env.GROQ_API_KEY // Get Groq API key
 
@@ -28,28 +23,19 @@ if (!GROQ_API_KEY) {
   process.exit(1)
 }
 
-// Initialize Deepgram and Groq services
 const groqService = new GroqService(GROQ_API_KEY) // Instantiate GroqService
 const deepgramService = new DeepgramService(DEEPGRAM_API_KEY, groqService) // Instantiate DeepgramService and pass GroqService
 
-// Get directory name in ESM
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-// Create Express application
 const app = express()
 const port = 3001
 
-// Create HTTP server
 const server = http.createServer(app)
-
-// Create WebSocket server
 const wss = new WebSocketServer({ server })
 
-// Serve static files
 app.use(express.static(path.join(__dirname, '../../public')))
-
-// Basic route for testing
 app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running' })
 })
@@ -57,10 +43,8 @@ app.get('/api/status', (req, res) => {
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket')
 
-  // Initialize Deepgram connection
   const deepgramWs = deepgramService.createWebSocket(ws)
 
-  // Send a welcome message to the client
   ws.send(
     JSON.stringify({
       type: 'connection',
@@ -70,20 +54,6 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (message) => {
     try {
-      const timestamp = Date.now()
-      const recordingsDir = path.join(__dirname, 'recordings')
-      const wavPath = path.join(recordingsDir, `audio-${timestamp}.wav`)
-
-      // ✅ Ensure the directory exists
-      if (!fs.existsSync(recordingsDir)) {
-        fs.mkdirSync(recordingsDir, { recursive: true })
-      }
-
-      // ✅ Save audio as proper WAV
-      writeWavFile(message, wavPath)
-      console.log(`Saved audio buffer as WAV to ${wavPath}`)
-
-      // Send to Deepgram
       deepgramService.handleClientMessage(deepgramWs, message, ws)
     } catch (error) {
       console.error('Error processing message:', error)
@@ -93,7 +63,6 @@ wss.on('connection', (ws) => {
     }
   })
 
-  // Handle client disconnection
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket')
     if (deepgramWs) {
@@ -104,7 +73,6 @@ wss.on('connection', (ws) => {
   })
 })
 
-// Start the server
 server.listen(port, () => {
   console.log(`Backend server running at http://localhost:${port}`)
   console.log(`WebSocket server running at ws://localhost:${port}`)

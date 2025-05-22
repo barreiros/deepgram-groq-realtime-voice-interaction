@@ -108,3 +108,4 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 - When you receive the command "close the task" or similar, you remove the consoles related with the task and commit the changes.
 - When you receive the command "debug the flow" or similar you should add consoles to the code to have an output of the main values involved in the issue that we need to fix.
 - Only output code, no text explanations.
+- Do not add comments to the code.

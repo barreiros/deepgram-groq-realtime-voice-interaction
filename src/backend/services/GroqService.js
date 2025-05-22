@@ -4,7 +4,7 @@ import {
   MessagesPlaceholder,
 } from '@langchain/core/prompts' // Import MessagesPlaceholder
 import { StringOutputParser } from '@langchain/core/output_parsers'
-import { DeepgramService } from './../deepgram/DeepgramService.js' // Import DeepgramService
+import { DeepgramService } from './DeepgramService.js' // Import DeepgramService
 import { ConversationSummaryBufferMemory } from 'langchain/memory' // Import ConversationSummaryBufferMemory
 import { RunnableSequence } from '@langchain/core/runnables' // Import RunnableSequence
 
