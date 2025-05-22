@@ -43,24 +43,22 @@ wss.on('connection', (ws) => {
 
   const eventEmitter = new EventEmitter()
   const groqService = new GroqService(GROQ_API_KEY, eventEmitter)
-  const deepgramService = new DeepgramService(DEEPGRAM_API_KEY, eventEmitter)
+  const sttService = new DeepgramService(DEEPGRAM_API_KEY, eventEmitter)
+  const ttsService = sttService
 
   eventEmitter.on('transcription', async ({ transcription }) => {
-    const groqResponse = await groqService.processTranscription(
-      transcription,
-      ws
-    )
+    const groqResponse = await groqService.processTranscription(transcription)
     ws.send(JSON.stringify({ groqResponse }))
   })
 
   eventEmitter.on('llm-text', async ({ text }) => {
     ws.send(JSON.stringify({ groqSentence: text }))
-    await deepgramService.synthesizeSpeech(text)
+    await ttsService.synthesizeSpeech(text)
   })
 
   eventEmitter.on('error', ({ error }) => {
-    console.error('Deepgram error:', error)
-    ws.send(JSON.stringify({ type: 'error', message: 'Deepgram error' }))
+    console.error('error:', error)
+    ws.send(JSON.stringify({ type: 'error', message: error }))
   })
 
   eventEmitter.on('metadata', ({ data }) => {
@@ -80,7 +78,7 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (message) => {
     try {
-      deepgramService.sendMessage(message)
+      sttService.sendMessage(message)
     } catch (error) {
       console.error('Error processing message:', error)
       ws.send(
@@ -91,9 +89,13 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket')
-    if (deepgramService) {
-      console.log('Closing Deepgram connection')
-      deepgramService.close()
+    if (sttService) {
+      console.log('Closing stt connection')
+      sttService.close()
+    }
+    if (ttsService !== sttService) {
+      console.log('Closing tts connection')
+      ttsService.close()
     }
   })
 })
