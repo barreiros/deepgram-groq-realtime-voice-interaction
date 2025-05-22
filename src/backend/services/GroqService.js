@@ -2,26 +2,23 @@ import { ChatGroq } from '@langchain/groq'
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
-} from '@langchain/core/prompts' // Import MessagesPlaceholder
+} from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
-import { DeepgramService } from './DeepgramService.js' // Import DeepgramService
-import { ConversationSummaryBufferMemory } from 'langchain/memory' // Import ConversationSummaryBufferMemory
-import { RunnableSequence } from '@langchain/core/runnables' // Import RunnableSequence
+import { ConversationSummaryBufferMemory } from 'langchain/memory'
+import { RunnableSequence } from '@langchain/core/runnables'
 
 class GroqService {
-  constructor() {
+  constructor(apiKey, eventEmitter) {
     this.model = new ChatGroq({
-      apiKey: process.env.GROQ_API_KEY,
+      apiKey: apiKey,
       model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
     })
 
-    // Initialize Groq model for memory summarization
     this.memoryModel = new ChatGroq({
-      apiKey: process.env.GROQ_API_KEY,
+      apiKey: apiKey,
       model: 'llama3-8b-8192', // Specify the Groq model for memory
     })
 
-    // Initialize ConversationSummaryBufferMemory
     this.memory = new ConversationSummaryBufferMemory({
       llm: this.memoryModel,
       maxTokenLimit: 1000,
@@ -52,10 +49,10 @@ class GroqService {
       this.outputParser,
     ])
 
-    this.deepgramService = new DeepgramService(process.env.DEEPGRAM_API_KEY) // Instantiate DeepgramService
+    this.eventEmitter = eventEmitter
   }
 
-  async processTranscription(transcription, ws) {
+  async processTranscription(transcription) {
     try {
       // Add user message to memory
       await this.memory.saveContext({ input: transcription }, { output: '' })
@@ -64,13 +61,12 @@ class GroqService {
         input: transcription,
       })
       let buffer = ''
-      let fullResponse = '' // To store the full response for saving to memory
+      let fullResponse = ''
 
       for await (const item of response) {
         buffer += item
-        fullResponse += item // Accumulate the full response
+        fullResponse += item
 
-        // Check for sentence endings
         const sentenceEndings = /[.!?]/
         let sentenceEndIndex = buffer.search(sentenceEndings)
 
@@ -80,27 +76,18 @@ class GroqService {
             .trim()
           console.log('Complete Sentence:', completeSentence)
 
-          // Send complete sentence to client
-          ws.send(JSON.stringify({ groqSentence: completeSentence }))
-
-          // Call DeepgramService to synthesize speech
-          await this.deepgramService.synthesizeSpeech(completeSentence, ws)
+          this.eventEmitter.emit('llm-text', { text: completeSentence })
 
           buffer = buffer.substring(sentenceEndIndex + 1).trimStart()
           sentenceEndIndex = buffer.search(sentenceEndings)
         }
       }
 
-      // Process any remaining text in the buffer as a final sentence
       if (buffer.length > 0) {
         const finalSentence = buffer.trim()
         console.log('Final Sentence (stream ended):', finalSentence)
 
-        // Send final sentence to client
-        ws.send(JSON.stringify({ groqSentence: finalSentence }))
-
-        // Call DeepgramService to synthesize speech for the final sentence
-        await this.deepgramService.synthesizeSpeech(finalSentence, ws)
+        this.eventEmitter.emit('llm-text', { text: finalSentence })
       }
 
       // Save the AI's full response to memory

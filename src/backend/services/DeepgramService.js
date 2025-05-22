@@ -3,35 +3,12 @@ import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
 let keepAlive = null
 
 export class DeepgramService {
-  constructor(apiKey, groqService) {
+  constructor(apiKey, eventEmitter) {
     this.apiKey = apiKey
+    this.eventEmitter = eventEmitter
     this.dgClient = createClient(this.apiKey)
-    this.groqService = groqService // Accept GroqService instance
-    console.log('DeepgramService instantiated with API key:', !!this.apiKey)
-  }
 
-  createWebSocket(clientWs) {
-    console.log('DeepgramService.createWebSocket called')
-    let deepgram = this.setupDeepgram(clientWs)
-
-    clientWs.on('close', () => {
-      console.log('socket: client disconnected')
-      if (deepgram) {
-        deepgram.finish()
-        deepgram.removeAllListeners()
-        deepgram = null
-      }
-      if (keepAlive) {
-        clearInterval(keepAlive)
-        keepAlive = null
-      }
-    })
-
-    return deepgram
-  }
-
-  setupDeepgram(ws) {
-    const deepgram = this.dgClient.listen.live({
+    this.deepgramWs = this.dgClient.listen.live({
       language: 'en',
       punctuate: true,
       smart_format: true,
@@ -41,60 +18,69 @@ export class DeepgramService {
     if (keepAlive) clearInterval(keepAlive)
     keepAlive = setInterval(() => {
       console.log('deepgram: keepalive')
-      deepgram.keepAlive()
+      this.deepgramWs.keepAlive()
     }, 10 * 1000)
 
-    deepgram.addListener(LiveTranscriptionEvents.Open, async () => {
+    this.deepgramWs.addListener(LiveTranscriptionEvents.Open, async () => {
       console.log('deepgram: connected')
 
-      deepgram.addListener(LiveTranscriptionEvents.Transcript, async (data) => {
-        console.log('deepgram: packet received', data)
-        console.log('deepgram: transcript received')
-        console.log('socket: transcript sent to client')
+      this.deepgramWs.addListener(
+        LiveTranscriptionEvents.Transcript,
+        async (data) => {
+          console.log('deepgram: packet received', data)
+          console.log('deepgram: transcript received')
+          console.log('socket: transcript sent to client')
 
-        // Process the transcription with Groq
-        if (data.channel.alternatives[0]?.transcript) {
-          const transcription = data.channel.alternatives[0].transcript
-          console.log('Processing transcription with Groq:', transcription)
-          try {
-            // Process the transcription with Groq
-            const groqResponse = await this.groqService.processTranscription(
-              transcription,
-              ws
-            )
-            console.log(
-              'Groq Processing Complete. Final Response:',
-              groqResponse
-            )
-            // The Groq response is streamed back to the client from GroqService
-          } catch (error) {
-            console.error('Error processing transcription with Groq:', error)
+          if (data.channel.alternatives[0]?.transcript) {
+            const transcription = data.channel.alternatives[0].transcript
+            console.log('Processing transcription with Groq:', transcription)
+            try {
+              this.eventEmitter.emit('transcription', { transcription })
+            } catch (error) {
+              console.error('Error processing transcription with Groq:', error)
+            }
           }
         }
-      })
+      )
 
-      deepgram.addListener(LiveTranscriptionEvents.Close, async () => {
+      this.deepgramWs.addListener(LiveTranscriptionEvents.Close, async () => {
         console.log('deepgram: disconnected')
         clearInterval(keepAlive)
         deepgram.finish()
       })
 
-      deepgram.addListener(LiveTranscriptionEvents.Error, async (error) => {
-        console.log('deepgram: error received')
-        console.error(error)
-      })
+      this.deepgramWs.addListener(
+        LiveTranscriptionEvents.Error,
+        async (error) => {
+          console.log('deepgram: error received')
+          console.error(error)
+        }
+      )
 
-      deepgram.addListener(LiveTranscriptionEvents.Warning, async (warning) => {
-        console.log('deepgram: warning received')
-        console.warn(warning)
-      })
+      this.deepgramWs.addListener(
+        LiveTranscriptionEvents.Warning,
+        async (warning) => {
+          console.log('deepgram: warning received')
+          console.warn(warning)
+        }
+      )
 
-      deepgram.addListener(LiveTranscriptionEvents.Metadata, (data) => {
+      this.deepgramWs.addListener(LiveTranscriptionEvents.Metadata, (data) => {
         console.log('deepgram: packet received')
         console.log('deepgram: metadata received')
         console.log('ws: metadata sent to client')
-        ws.send(JSON.stringify({ metadata: data }))
+        this.eventEmitter.emit('metadata', { metadata: data })
       })
+    })
+    console.log('DeepgramService instantiated with API key:', !!this.apiKey)
+  }
+
+  createWebSocket(clientWs) {
+    console.log('DeepgramService.createWebSocket called')
+    let deepgram = this.setupDeepgram(clientWs)
+
+    clientWs.on('close', () => {
+      console.log('socket: client disconnected')
     })
 
     return deepgram
@@ -120,17 +106,15 @@ export class DeepgramService {
       const data = Buffer.concat(chunks)
 
       console.log('DeepgramService.synthesizeSpeech received audio data')
-      // Send the audio data back to the client
-      ws.send(data)
+      this.eventEmitter.emit('speech', { audio: data })
     } catch (error) {
       console.error('Error synthesizing speech with Deepgram:', error)
       console.error('Deepgram TTS Error Details:', error) // Log the full error object
-      // Optionally send an error message back to the client
-      ws.send(JSON.stringify({ error: 'Error synthesizing speech' }))
+      this.eventEmitter.emit('error', { message: 'Error synthesizing speech' })
     }
   }
 
-  handleClientMessage(deepgram, message, ws) {
+  sendMessage(message) {
     try {
       // console.log(
       //   'DeepgramService.handleClientMessage called. type:',
@@ -140,20 +124,32 @@ export class DeepgramService {
       //   'length:',
       //   message?.length
       // )
-      if (deepgram.getReadyState() === 1) {
+      if (this.deepgramWs.getReadyState() === 1) {
         console.log('socket: data sent to deepgram', message)
-        deepgram.send(message)
+        this.deepgramWs.send(message)
       } else if (deepgram.getReadyState() >= 2) {
         console.log("socket: data couldn't be sent to deepgram")
         console.log('socket: retrying connection to deepgram')
-        deepgram.finish()
-        deepgram.removeAllListeners()
-        deepgram = this.setupDeepgram(ws)
+        this.deepgramWs.finish()
+        this.deepgramWs.removeAllListeners()
+        this.deepgramWs = this.setupDeepgram(ws)
       } else {
         console.log("socket: data couldn't be sent to deepgram")
       }
     } catch (error) {
       console.error('Error sending audio to Deepgram:', error)
+    }
+  }
+
+  close() {
+    if (this.deepgramWs) {
+      this.deepgramWs.finish()
+      this.deepgramWs.removeAllListeners()
+      this.deepgramWs = null
+    }
+    if (keepAlive) {
+      clearInterval(keepAlive)
+      keepAlive = null
     }
   }
 }

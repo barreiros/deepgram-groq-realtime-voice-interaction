@@ -7,11 +7,12 @@ import { dirname } from 'path'
 import dotenv from 'dotenv'
 import DeepgramService from './services/DeepgramService.js'
 import GroqService from './services/GroqService.js'
+import { EventEmitter } from 'events'
 
 dotenv.config()
 
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
-const GROQ_API_KEY = process.env.GROQ_API_KEY // Get Groq API key
+const GROQ_API_KEY = process.env.GROQ_API_KEY
 
 if (!DEEPGRAM_API_KEY) {
   console.error('DEEPGRAM_API_KEY environment variable is not set!')
@@ -22,9 +23,6 @@ if (!GROQ_API_KEY) {
   console.error('GROQ_API_KEY environment variable is not set!')
   process.exit(1)
 }
-
-const groqService = new GroqService(GROQ_API_KEY) // Instantiate GroqService
-const deepgramService = new DeepgramService(DEEPGRAM_API_KEY, groqService) // Instantiate DeepgramService and pass GroqService
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -43,7 +41,35 @@ app.get('/api/status', (req, res) => {
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket')
 
-  const deepgramWs = deepgramService.createWebSocket(ws)
+  const eventEmitter = new EventEmitter()
+  const groqService = new GroqService(GROQ_API_KEY, eventEmitter)
+  const deepgramService = new DeepgramService(DEEPGRAM_API_KEY, eventEmitter)
+
+  eventEmitter.on('transcription', async ({ transcription }) => {
+    const groqResponse = await groqService.processTranscription(
+      transcription,
+      ws
+    )
+    ws.send(JSON.stringify({ groqResponse }))
+  })
+
+  eventEmitter.on('llm-text', async ({ text }) => {
+    ws.send(JSON.stringify({ groqSentence: text }))
+    await deepgramService.synthesizeSpeech(text)
+  })
+
+  eventEmitter.on('error', ({ error }) => {
+    console.error('Deepgram error:', error)
+    ws.send(JSON.stringify({ type: 'error', message: 'Deepgram error' }))
+  })
+
+  eventEmitter.on('metadata', ({ data }) => {
+    ws.send(JSON.stringify({ metadata: data }))
+  })
+
+  eventEmitter.on('speech', ({ audio }) => {
+    ws.send(audio)
+  })
 
   ws.send(
     JSON.stringify({
@@ -54,7 +80,7 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (message) => {
     try {
-      deepgramService.handleClientMessage(deepgramWs, message, ws)
+      deepgramService.sendMessage(message)
     } catch (error) {
       console.error('Error processing message:', error)
       ws.send(
@@ -65,10 +91,9 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket')
-    if (deepgramWs) {
+    if (deepgramService) {
       console.log('Closing Deepgram connection')
-      deepgramWs.removeAllListeners()
-      deepgramWs.finish()
+      deepgramService.close()
     }
   })
 })
