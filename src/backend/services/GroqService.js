@@ -11,6 +11,8 @@ import SentenceCompletion from '../tools/SentenceCompletion.js'
 class GroqService {
   constructor(apiKey, eventEmitter, language = 'en') {
     this.language = language
+    this.lastActivityTime = Date.now()
+    this.silenceTimeout = null
     this.model = new ChatGroq({
       apiKey: apiKey,
       model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
@@ -54,7 +56,34 @@ class GroqService {
     this.eventEmitter = eventEmitter
   }
 
+  startSilenceTimeout() {
+    if (this.silenceTimeout) clearTimeout(this.silenceTimeout)
+
+    this.silenceTimeout = setTimeout(() => {
+      if (Date.now() - this.lastActivityTime >= 3000) {
+        this.processBufferIfInactive()
+      }
+    }, 3000)
+  }
+
+  async processBufferIfInactive() {
+    if (
+      Date.now() - this.lastActivityTime >= 3000 &&
+      this.transcriptionBuffer
+    ) {
+      const completeSentence = this.transcriptionBuffer
+      this.transcriptionBuffer = ''
+      await this.processBuffer(completeSentence)
+    }
+  }
+
+  async sendToSilenceService(content) {
+    console.log('Sending to silence service:', content)
+    // Actual implementation would go here
+  }
+
   async processTranscription(transcription) {
+    this.lastActivityTime = Date.now()
     const spacedTranscription = this.transcriptionBuffer
       ? ' ' + transcription
       : transcription
@@ -62,6 +91,7 @@ class GroqService {
       (this.transcriptionBuffer || '') + spacedTranscription
 
     if (this.bufferTimeout) clearTimeout(this.bufferTimeout)
+    this.startSilenceTimeout()
 
     if (
       SentenceCompletion.isComplete(this.transcriptionBuffer, this.language)
@@ -70,14 +100,8 @@ class GroqService {
       const completeSentence = this.transcriptionBuffer
       this.transcriptionBuffer = ''
       await this.processBuffer(completeSentence)
-    } else {
-      // this.bufferTimeout = setTimeout(async () => {
-      //   if (this.transcriptionBuffer) {
-      //     await this.processBuffer(this.transcriptionBuffer)
-      //     this.transcriptionBuffer = ''
-      //   }
-      // }, 3000)
     }
+
     return ''
   }
 
@@ -90,6 +114,7 @@ class GroqService {
     try {
       // Add user message to memory
       await this.memory.saveContext({ input: textToSend }, { output: '' })
+      await this.sendToSilenceService(textToSend)
 
       const response = await this.chain.stream({ input: textToSend })
       let fullResponse = ''
