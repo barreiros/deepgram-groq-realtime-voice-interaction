@@ -13,6 +13,9 @@ export class DeepgramService {
       punctuate: true,
       smart_format: true,
       model: 'nova',
+      encoding: 'linear16',
+      sample_rate: 16000,
+      channels: 1,
     })
 
     if (keepAlive) clearInterval(keepAlive)
