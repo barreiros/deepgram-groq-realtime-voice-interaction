@@ -3,19 +3,20 @@ import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
 let keepAlive = null
 
 export class DeepgramService {
-  constructor(apiKey, eventEmitter) {
+  constructor(apiKey, eventEmitter, params = {}) {
+    this.params = params
     this.apiKey = apiKey
     this.eventEmitter = eventEmitter
     this.dgClient = createClient(this.apiKey)
 
     this.deepgramWs = this.dgClient.listen.live({
-      language: 'en',
+      language: params.language || 'en',
       punctuate: true,
       smart_format: true,
       model: 'nova',
-      encoding: 'linear16',
-      sample_rate: 16000,
-      channels: 1,
+      sample_rate: params?.sample_rate ? parseInt(params.sample_rate) : 16000,
+      channels: params?.channels ? parseInt(params.channels) : 1,
+      ...params,
     })
 
     if (keepAlive) clearInterval(keepAlive)
@@ -46,7 +47,7 @@ export class DeepgramService {
       this.deepgramWs.addListener(LiveTranscriptionEvents.Close, async () => {
         console.log('deepgram: disconnected')
         clearInterval(keepAlive)
-        deepgram.finish()
+        this.close()
       })
 
       this.deepgramWs.addListener(

@@ -8,6 +8,7 @@ import dotenv from 'dotenv'
 import DeepgramService from './services/DeepgramService.js'
 import GroqService from './services/GroqService.js'
 import { EventEmitter } from 'events'
+import url from 'url'
 
 dotenv.config()
 
@@ -38,12 +39,20 @@ app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running' })
 })
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   console.log('Client connected to WebSocket')
 
   const eventEmitter = new EventEmitter()
-  const groqService = new GroqService(GROQ_API_KEY, eventEmitter, 'en') // Default to English
-  const sttService = new DeepgramService(DEEPGRAM_API_KEY, eventEmitter)
+  const queryParams = url.parse(req.url, true).query
+
+  console.log('Query parameters:', queryParams)
+  const groqService = new GroqService(GROQ_API_KEY, eventEmitter, queryParams)
+
+  const sttService = new DeepgramService(
+    DEEPGRAM_API_KEY,
+    eventEmitter,
+    queryParams
+  )
   const ttsService = sttService
 
   eventEmitter.on('transcription', async ({ transcription }) => {

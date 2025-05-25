@@ -9,13 +9,16 @@ import { RunnableSequence } from '@langchain/core/runnables'
 import SentenceCompletion from '../tools/SentenceCompletion.js'
 
 class GroqService {
-  constructor(apiKey, eventEmitter, language = 'en') {
-    this.language = language
+  constructor(apiKey, eventEmitter, params = {}) {
+    this.params = params
+    this.language = params.langugage || 'en'
     this.lastActivityTime = Date.now()
     this.silenceTimeout = null
     this.model = new ChatGroq({
       apiKey: apiKey,
-      model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+      model:
+        this.params.model || 'meta-llama/llama-4-maverick-17b-128e-instruct',
+      temperature: this.params.temp ? parseFloat(this.params.temp) : 0.7,
     })
 
     this.memoryModel = new ChatGroq({
