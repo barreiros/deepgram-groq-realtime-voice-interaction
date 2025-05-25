@@ -47,13 +47,15 @@ wss.on('connection', (ws) => {
   const ttsService = sttService
 
   eventEmitter.on('transcription', async ({ transcription }) => {
+    console.log('Received transcription from STT:', transcription)
     const groqResponse = await groqService.processTranscription(transcription)
     ws.send(JSON.stringify({ groqResponse }))
   })
 
   eventEmitter.on('llm-text', async ({ text }) => {
-    ws.send(JSON.stringify({ groqSentence: text }))
-    await ttsService.synthesizeSpeech(text)
+    // ws.send(JSON.stringify({ groqSentence: text }))
+    // await ttsService.synthesizeSpeech(text)
+    console.log('LLM Text:', text)
   })
 
   eventEmitter.on('error', ({ error }) => {

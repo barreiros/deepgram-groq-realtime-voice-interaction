@@ -53,53 +53,54 @@ class GroqService {
   }
 
   async processTranscription(transcription) {
+    const SENTENCE_END = /([.!?])\s*$/
+    this.transcriptionBuffer = (this.transcriptionBuffer || '') + transcription
+
+    if (this.bufferTimeout) clearTimeout(this.bufferTimeout)
+
+    const match = this.transcriptionBuffer.match(SENTENCE_END)
+    if (match) {
+      const splitIndex = match.index + match[1].length
+      const completeSentence = this.transcriptionBuffer.slice(0, splitIndex)
+      const remainingText = this.transcriptionBuffer
+        .slice(splitIndex)
+        .trimStart()
+
+      this.transcriptionBuffer = remainingText
+      await this.processBuffer(completeSentence)
+    } else {
+      this.bufferTimeout = setTimeout(async () => {
+        if (this.transcriptionBuffer) {
+          await this.processBuffer(this.transcriptionBuffer)
+          this.transcriptionBuffer = ''
+        }
+      }, 3000)
+    }
+    return ''
+  }
+
+  async processBuffer(textToSend) {
+    console.log('Processing buffer`', textToSend)
     try {
       // Add user message to memory
-      await this.memory.saveContext({ input: transcription }, { output: '' })
+      await this.memory.saveContext({ input: textToSend }, { output: '' })
 
-      const response = await this.chain.stream({
-        input: transcription,
-      })
-      let buffer = ''
+      const response = await this.chain.stream({ input: textToSend })
       let fullResponse = ''
 
       for await (const item of response) {
-        buffer += item
         fullResponse += item
-
-        const sentenceEndings = /[.!?]/
-        let sentenceEndIndex = buffer.search(sentenceEndings)
-
-        while (sentenceEndIndex !== -1) {
-          const completeSentence = buffer
-            .substring(0, sentenceEndIndex + 1)
-            .trim()
-          console.log('Complete Sentence:', completeSentence)
-
-          this.eventEmitter.emit('llm-text', { text: completeSentence })
-
-          buffer = buffer.substring(sentenceEndIndex + 1).trimStart()
-          sentenceEndIndex = buffer.search(sentenceEndings)
-        }
-      }
-
-      if (buffer.length > 0) {
-        const finalSentence = buffer.trim()
-        console.log('Final Sentence (stream ended):', finalSentence)
-
-        this.eventEmitter.emit('llm-text', { text: finalSentence })
+        this.eventEmitter.emit('llm-text', { text: item })
       }
 
       // Save the AI's full response to memory
       await this.memory.saveContext(
-        { input: transcription },
+        { input: textToSend },
         { output: fullResponse }
       )
-
-      return '' // Returning empty string as sentences are handled within the loop
     } catch (error) {
-      console.error('Error processing transcription with Groq:', error)
-      throw error
+      console.error('Error processing buffer:', error)
+      this.eventEmitter.emit('error', { error: error.message })
     }
   }
 }

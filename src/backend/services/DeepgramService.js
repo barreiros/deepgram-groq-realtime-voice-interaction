@@ -31,12 +31,9 @@ export class DeepgramService {
         LiveTranscriptionEvents.Transcript,
         async (data) => {
           console.log('deepgram: packet received', data)
-          console.log('deepgram: transcript received')
-          console.log('socket: transcript sent to client')
 
           if (data.channel.alternatives[0]?.transcript) {
             const transcription = data.channel.alternatives[0].transcript
-            console.log('Processing transcription with Groq:', transcription)
             try {
               this.eventEmitter.emit('transcription', { transcription })
             } catch (error) {
@@ -128,7 +125,7 @@ export class DeepgramService {
       //   message?.length
       // )
       if (this.deepgramWs.getReadyState() === 1) {
-        console.log('socket: data sent to deepgram', message)
+        // console.log('socket: data sent to deepgram', message)
         this.deepgramWs.send(message)
       } else if (deepgram.getReadyState() >= 2) {
         console.log("socket: data couldn't be sent to deepgram")
