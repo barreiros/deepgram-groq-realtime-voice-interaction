@@ -6,9 +6,11 @@ import {
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import { ConversationSummaryBufferMemory } from 'langchain/memory'
 import { RunnableSequence } from '@langchain/core/runnables'
+import SentenceCompletion from '../tools/SentenceCompletion.js'
 
 class GroqService {
-  constructor(apiKey, eventEmitter) {
+  constructor(apiKey, eventEmitter, language = 'en') {
+    this.language = language
     this.model = new ChatGroq({
       apiKey: apiKey,
       model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
@@ -53,34 +55,38 @@ class GroqService {
   }
 
   async processTranscription(transcription) {
-    const SENTENCE_END = /([.!?])\s*$/
-    this.transcriptionBuffer = (this.transcriptionBuffer || '') + transcription
+    const spacedTranscription = this.transcriptionBuffer
+      ? ' ' + transcription
+      : transcription
+    this.transcriptionBuffer =
+      (this.transcriptionBuffer || '') + spacedTranscription
 
     if (this.bufferTimeout) clearTimeout(this.bufferTimeout)
 
-    const match = this.transcriptionBuffer.match(SENTENCE_END)
-    if (match) {
-      const splitIndex = match.index + match[1].length
-      const completeSentence = this.transcriptionBuffer.slice(0, splitIndex)
-      const remainingText = this.transcriptionBuffer
-        .slice(splitIndex)
-        .trimStart()
-
-      this.transcriptionBuffer = remainingText
+    if (
+      SentenceCompletion.isComplete(this.transcriptionBuffer, this.language)
+    ) {
+      console.log('Sentence is complete:', this.transcriptionBuffer)
+      const completeSentence = this.transcriptionBuffer
+      this.transcriptionBuffer = ''
       await this.processBuffer(completeSentence)
     } else {
-      this.bufferTimeout = setTimeout(async () => {
-        if (this.transcriptionBuffer) {
-          await this.processBuffer(this.transcriptionBuffer)
-          this.transcriptionBuffer = ''
-        }
-      }, 3000)
+      // this.bufferTimeout = setTimeout(async () => {
+      //   if (this.transcriptionBuffer) {
+      //     await this.processBuffer(this.transcriptionBuffer)
+      //     this.transcriptionBuffer = ''
+      //   }
+      // }, 3000)
     }
     return ''
   }
 
   async processBuffer(textToSend) {
-    console.log('Processing buffer`', textToSend)
+    console.log('Processing buffer:', textToSend)
+    console.log(
+      'Sentence complete check:',
+      SentenceCompletion.isComplete(textToSend)
+    )
     try {
       // Add user message to memory
       await this.memory.saveContext({ input: textToSend }, { output: '' })

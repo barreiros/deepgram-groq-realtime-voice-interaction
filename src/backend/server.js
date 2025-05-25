@@ -42,7 +42,7 @@ wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket')
 
   const eventEmitter = new EventEmitter()
-  const groqService = new GroqService(GROQ_API_KEY, eventEmitter)
+  const groqService = new GroqService(GROQ_API_KEY, eventEmitter, 'en') // Default to English
   const sttService = new DeepgramService(DEEPGRAM_API_KEY, eventEmitter)
   const ttsService = sttService
 
@@ -80,6 +80,7 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (message) => {
     try {
+      console.log('Received message from client:', message)
       sttService.sendMessage(message)
     } catch (error) {
       console.error('Error processing message:', error)
