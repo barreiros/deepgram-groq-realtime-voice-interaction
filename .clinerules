@@ -42,7 +42,6 @@ This project is a full-stack application that integrates Three.js for 3D renderi
 │   │   ├── components/ # React components
 │   │   │   ├── Scene.jsx    # Three.js scene
 │   │   └── services/   # Frontend services
-│   │       ├── deepgram/    # Deepgram integration
 │   │       │   └── DeepgramWebSocketService.js
 │   │       ├── three/       # Three.js services
 │   │       │   ├── PhysicsEngine.js

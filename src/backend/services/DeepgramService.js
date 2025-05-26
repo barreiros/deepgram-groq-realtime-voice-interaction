@@ -1,4 +1,8 @@
-import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
+import {
+  createClient,
+  LiveTranscriptionEvents,
+  LiveTTSEvents,
+} from '@deepgram/sdk'
 
 export class DeepgramService {
   constructor(apiKey, eventEmitter, params = {}) {
@@ -47,10 +51,10 @@ export class DeepgramService {
 
   setupSpeakHandlers() {
     this.speakConnection
-      .on('open', this.handleSpeakOpen.bind(this))
-      .on('error', this.handleSpeakError.bind(this))
-      .on('close', this.handleSpeakClose.bind(this))
-      .on('data', this.handleSpeakData.bind(this))
+      .on(LiveTTSEvents.Open, this.handleSpeakOpen.bind(this))
+      .on(LiveTTSEvents.Error, this.handleSpeakError.bind(this))
+      .on(LiveTTSEvents.Close, this.handleSpeakClose.bind(this))
+      .on(LiveTTSEvents.Audio, this.handleSpeakData.bind(this))
   }
 
   startKeepAlive() {
@@ -115,6 +119,7 @@ export class DeepgramService {
   }
 
   handleSpeakData(audioChunk) {
+    console.log('Deepgram audio received:', audioChunk)
     this.eventEmitter.emit('speech', { audio: audioChunk })
   }
 
@@ -131,21 +136,22 @@ export class DeepgramService {
 
   async synthesizeSpeech(text) {
     console.log('DeepgramService synthesizeSpeech', text)
-    if (
-      !this.speakConnection ||
-      this.speakConnection.getReadyState() !== 'open'
-    ) {
-      await this.initializeSpeakConnection()
-    }
+    // if (
+    //   !this.speakConnection ||
+    //   this.speakConnection.getReadyState() !== 'open'
+    // ) {
+    //   await this.initializeSpeakConnection()
+    // }
     console.log('DeepgramService synthesizeSpeech B')
     this.speakConnection.sendText(text)
   }
 
   async initializeSpeakConnection() {
+    console.log('Initializing Deepgram TTS connection')
     this.speakConnection = this.dgClient.speak.live({
-      model: 'aura-asteria-en',
+      model: 'aura-2-thalia-en',
       encoding: 'linear16',
-      container: 'wav',
+      sample_rate: 48000,
     })
 
     this.setupSpeakHandlers()
