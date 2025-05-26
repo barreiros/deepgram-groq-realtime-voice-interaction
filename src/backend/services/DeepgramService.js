@@ -1,83 +1,128 @@
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
 
-let keepAlive = null
-
 export class DeepgramService {
   constructor(apiKey, eventEmitter, params = {}) {
-    this.params = params
     this.apiKey = apiKey
     this.eventEmitter = eventEmitter
+    this.params = params
     this.dgClient = createClient(this.apiKey)
     
+    this.listenConnection = null
     this.ttsConnection = null
+    
     this.ttsQueue = []
-    this.ttsTimeout = null
+    this.keepAliveInterval = null
+    this.inactivityTimer = null
 
-    this.deepgramWs = this.dgClient.listen.live({
-      language: params.language || 'en',
+    this.initializeListenConnection()
+    console.log('DeepgramService instantiated with API key:', !!this.apiKey)
+  }
+
+  initializeListenConnection() {
+    this.listenConnection = this.dgClient.listen.live({
+      language: this.params.language || 'en',
       punctuate: true,
       smart_format: true,
       model: 'nova',
-      sample_rate: params?.sample_rate ? parseInt(params.sample_rate) : 16000,
-      channels: params?.channels ? parseInt(params.channels) : 1,
-      ...params,
+      sample_rate: this.params?.sample_rate ? parseInt(this.params.sample_rate) : 16000,
+      channels: this.params?.channels ? parseInt(this.params.channels) : 1,
+      ...this.params,
     })
 
-    if (keepAlive) clearInterval(keepAlive)
-    keepAlive = setInterval(() => {
+    this.setupListenHandlers()
+    this.startKeepAlive()
+  }
+
+  setupListenHandlers() {
+    this.listenConnection
+      .on(LiveTranscriptionEvents.Open, this.handleListenOpen.bind(this))
+      .on(LiveTranscriptionEvents.Transcript, this.handleTranscript.bind(this))
+      .on(LiveTranscriptionEvents.Close, this.handleListenClose.bind(this))
+      .on(LiveTranscriptionEvents.Error, this.handleListenError.bind(this))
+      .on(LiveTranscriptionEvents.Warning, this.handleListenWarning.bind(this))
+      .on(LiveTranscriptionEvents.Metadata, this.handleMetadata.bind(this))
+  }
+
+  setupTTSHandlers() {
+    this.ttsConnection
+      .on('open', this.handleTTSOpen.bind(this))
+      .on('error', this.handleTTSError.bind(this))
+      .on('close', this.handleTTSClose.bind(this))
+      .on('data', this.handleTTSData.bind(this))
+  }
+
+  startKeepAlive() {
+    this.keepAliveInterval = setInterval(() => {
       console.log('deepgram: keepalive')
-      this.deepgramWs.keepAlive()
+      this.listenConnection?.keepAlive()
     }, 10 * 1000)
+  }
 
-    this.deepgramWs.addListener(LiveTranscriptionEvents.Open, async () => {
-      console.log('deepgram: connected')
+  resetInactivityTimer() {
+    clearTimeout(this.inactivityTimer)
+    this.inactivityTimer = setTimeout(() => {
+      this.ttsConnection?.finish()
+    }, 30000)
+  }
 
-      this.deepgramWs.addListener(
-        LiveTranscriptionEvents.Transcript,
-        async (data) => {
-          console.log('deepgram: packet received', data)
+  handleListenOpen() {
+    console.log('deepgram: connected')
+  }
 
-          if (data.channel.alternatives[0]?.transcript) {
-            const transcription = data.channel.alternatives[0].transcript
-            try {
-              this.eventEmitter.emit('transcription', { transcription })
-            } catch (error) {
-              console.error('Error processing transcription with Groq:', error)
-            }
-          }
-        }
-      )
+  handleTranscript(data) {
+    console.log('deepgram: packet received', data)
 
-      this.deepgramWs.addListener(LiveTranscriptionEvents.Close, async () => {
-        console.log('deepgram: disconnected')
-        clearInterval(keepAlive)
-        this.close()
-      })
+    if (data.channel.alternatives[0]?.transcript) {
+      const transcription = data.channel.alternatives[0].transcript
+      try {
+        this.eventEmitter.emit('transcription', { transcription })
+      } catch (error) {
+        console.error('Error processing transcription with Groq:', error)
+      }
+    }
+  }
 
-      this.deepgramWs.addListener(
-        LiveTranscriptionEvents.Error,
-        async (error) => {
-          console.log('deepgram: error received')
-          console.error(error)
-        }
-      )
+  handleListenClose() {
+    console.log('deepgram: disconnected')
+    this.close()
+  }
 
-      this.deepgramWs.addListener(
-        LiveTranscriptionEvents.Warning,
-        async (warning) => {
-          console.log('deepgram: warning received')
-          console.warn(warning)
-        }
-      )
+  handleListenError(error) {
+    console.log('deepgram: error received')
+    console.error(error)
+  }
 
-      this.deepgramWs.addListener(LiveTranscriptionEvents.Metadata, (data) => {
-        console.log('deepgram: packet received')
-        console.log('deepgram: metadata received')
-        console.log('ws: metadata sent to client')
-        this.eventEmitter.emit('metadata', { metadata: data })
-      })
-    })
-    console.log('DeepgramService instantiated with API key:', !!this.apiKey)
+  handleListenWarning(warning) {
+    console.log('deepgram: warning received')
+    console.warn(warning)
+  }
+
+  handleMetadata(data) {
+    console.log('deepgram: packet received')
+    console.log('deepgram: metadata received')
+    console.log('ws: metadata sent to client')
+    this.eventEmitter.emit('metadata', { metadata: data })
+  }
+
+  handleTTSOpen() {
+    console.log('Deepgram TTS connection opened')
+    this.processTTSText()
+  }
+
+  handleTTSError(error) {
+    console.error('Deepgram TTS error:', error)
+    this.eventEmitter.emit('error', { message: 'TTS connection error' })
+    this.resetTTSConnection()
+  }
+
+  handleTTSClose() {
+    console.log('Deepgram TTS connection closed')
+    this.resetTTSConnection()
+  }
+
+  handleTTSData(audioChunk) {
+    this.eventEmitter.emit('speech', { audio: audioChunk })
+    this.resetInactivityTimer()
   }
 
   createWebSocket(clientWs) {
@@ -107,26 +152,8 @@ export class DeepgramService {
       container: 'wav'
     })
 
-    this.ttsConnection.on('open', () => {
-      console.log('Deepgram TTS connection opened')
-      this.processTTSText()
-    })
-
-    this.ttsConnection.on('error', (error) => {
-      console.error('Deepgram TTS error:', error)
-      this.eventEmitter.emit('error', { message: 'TTS connection error' })
-      this.resetTTSConnection()
-    })
-
-    this.ttsConnection.on('close', () => {
-      console.log('Deepgram TTS connection closed')
-      this.resetTTSConnection()
-    })
-
-    this.ttsConnection.on('data', (audioChunk) => {
-      this.eventEmitter.emit('speech', { audio: audioChunk })
-      this.resetTTSTimeout()
-    })
+    this.setupTTSHandlers()
+    this.resetInactivityTimer()
   }
 
   processTTSText() {
@@ -140,19 +167,10 @@ export class DeepgramService {
     this.ttsConnection.finish()
   }
 
-  resetTTSTimeout() {
-    clearTimeout(this.ttsTimeout)
-    this.ttsTimeout = setTimeout(() => {
-      if (this.ttsConnection) {
-        this.ttsConnection.finish()
-      }
-    }, 30000)
-  }
-
   resetTTSConnection() {
     this.ttsConnection = null
     this.ttsQueue = []
-    clearTimeout(this.ttsTimeout)
+    clearTimeout(this.inactivityTimer)
   }
 
   sendMessage(message) {
@@ -165,15 +183,15 @@ export class DeepgramService {
       //   'length:',
       //   message?.length
       // )
-      if (this.deepgramWs.getReadyState() === 1) {
+      if (this.listenConnection.getReadyState() === 1) {
         // console.log('socket: data sent to deepgram', message)
-        this.deepgramWs.send(message)
-      } else if (this.deepgramWs.getReadyState() >= 2) {
+        this.listenConnection.send(message)
+      } else if (this.listenConnection.getReadyState() >= 2) {
         console.log("socket: data couldn't be sent to deepgram")
         console.log('socket: retrying connection to deepgram')
-        this.deepgramWs.finish()
-        this.deepgramWs.removeAllListeners()
-        this.deepgramWs = this.setupDeepgram(ws)
+        this.listenConnection.finish()
+        this.listenConnection.removeAllListeners()
+        this.initializeListenConnection()
       } else {
         console.log("socket: data couldn't be sent to deepgram")
       }
@@ -183,19 +201,19 @@ export class DeepgramService {
   }
 
   close() {
-    if (this.deepgramWs) {
-      this.deepgramWs.finish()
-      this.deepgramWs.removeAllListeners()
-      this.deepgramWs = null
+    if (this.listenConnection) {
+      this.listenConnection.finish()
+      this.listenConnection.removeAllListeners()
+      this.listenConnection = null
     }
     if (this.ttsConnection) {
       this.ttsConnection.finish()
       this.ttsConnection = null
     }
     this.resetTTSConnection()
-    if (keepAlive) {
-      clearInterval(keepAlive)
-      keepAlive = null
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval)
+      this.keepAliveInterval = null
     }
   }
 }
