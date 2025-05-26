@@ -136,12 +136,9 @@ export class DeepgramService {
 
   async synthesizeSpeech(text) {
     console.log('DeepgramService synthesizeSpeech', text)
-    // if (
-    //   !this.speakConnection ||
-    //   this.speakConnection.getReadyState() !== 'open'
-    // ) {
-    //   await this.initializeSpeakConnection()
-    // }
+    if (!this.speakConnection || this.speakConnection.getReadyState() >= 2) {
+      await this.initializeSpeakConnection()
+    }
     console.log('DeepgramService synthesizeSpeech B')
     this.speakConnection.sendText(text)
   }
