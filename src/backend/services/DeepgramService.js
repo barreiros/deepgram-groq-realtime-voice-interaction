@@ -8,13 +8,14 @@ export class DeepgramService {
     this.dgClient = createClient(this.apiKey)
     
     this.listenConnection = null
-    this.ttsConnection = null
+    this.speakConnection = null
     
-    this.ttsQueue = []
+    this.speakQueue = []
     this.keepAliveInterval = null
     this.inactivityTimer = null
 
     this.initializeListenConnection()
+    this.initializeSpeakConnection()
     console.log('DeepgramService instantiated with API key:', !!this.apiKey)
   }
 
@@ -43,12 +44,12 @@ export class DeepgramService {
       .on(LiveTranscriptionEvents.Metadata, this.handleMetadata.bind(this))
   }
 
-  setupTTSHandlers() {
-    this.ttsConnection
-      .on('open', this.handleTTSOpen.bind(this))
-      .on('error', this.handleTTSError.bind(this))
-      .on('close', this.handleTTSClose.bind(this))
-      .on('data', this.handleTTSData.bind(this))
+  setupSpeakHandlers() {
+    this.speakConnection
+      .on('open', this.handleSpeakOpen.bind(this))
+      .on('error', this.handleSpeakError.bind(this))
+      .on('close', this.handleSpeakClose.bind(this))
+      .on('data', this.handleSpeakData.bind(this))
   }
 
   startKeepAlive() {
@@ -61,7 +62,7 @@ export class DeepgramService {
   resetInactivityTimer() {
     clearTimeout(this.inactivityTimer)
     this.inactivityTimer = setTimeout(() => {
-      this.ttsConnection?.finish()
+      this.speakConnection?.finish()
     }, 30000)
   }
 
@@ -104,23 +105,23 @@ export class DeepgramService {
     this.eventEmitter.emit('metadata', { metadata: data })
   }
 
-  handleTTSOpen() {
+  handleSpeakOpen() {
     console.log('Deepgram TTS connection opened')
-    this.processTTSText()
+    this.processSpeakText()
   }
 
-  handleTTSError(error) {
+  handleSpeakError(error) {
     console.error('Deepgram TTS error:', error)
     this.eventEmitter.emit('error', { message: 'TTS connection error' })
-    this.resetTTSConnection()
+    this.resetSpeakConnection()
   }
 
-  handleTTSClose() {
+  handleSpeakClose() {
     console.log('Deepgram TTS connection closed')
-    this.resetTTSConnection()
+    this.resetSpeakConnection()
   }
 
-  handleTTSData(audioChunk) {
+  handleSpeakData(audioChunk) {
     this.eventEmitter.emit('speech', { audio: audioChunk })
     this.resetInactivityTimer()
   }
@@ -137,39 +138,39 @@ export class DeepgramService {
   }
 
   async synthesizeSpeech(text) {
-    if (!this.ttsConnection || this.ttsConnection.getReadyState() !== 'open') {
-      await this.initializeTTSConnection()
+    if (!this.speakConnection || this.speakConnection.getReadyState() !== 'open') {
+      await this.initializeSpeakConnection()
     }
 
-    this.ttsQueue.push(text)
-    this.processTTSText()
+    this.speakQueue.push(text)
+    this.processSpeakText()
   }
 
-  async initializeTTSConnection() {
-    this.ttsConnection = this.dgClient.speak.live({
+  async initializeSpeakConnection() {
+    this.speakConnection = this.dgClient.speak.live({
       model: 'aura-asteria-en',
       encoding: 'linear16',
       container: 'wav'
     })
 
-    this.setupTTSHandlers()
+    this.setupSpeakHandlers()
     this.resetInactivityTimer()
   }
 
-  processTTSText() {
-    if (!this.ttsConnection || this.ttsConnection.getReadyState() !== 'open') return
-    if (this.ttsQueue.length === 0) return
+  processSpeakText() {
+    if (!this.speakConnection || this.speakConnection.getReadyState() !== 'open') return
+    if (this.speakQueue.length === 0) return
 
-    while (this.ttsQueue.length > 0) {
-      const text = this.ttsQueue.shift()
-      this.ttsConnection.send(text)
+    while (this.speakQueue.length > 0) {
+      const text = this.speakQueue.shift()
+      this.speakConnection.send(text)
     }
-    this.ttsConnection.finish()
+    this.speakConnection.finish()
   }
 
-  resetTTSConnection() {
-    this.ttsConnection = null
-    this.ttsQueue = []
+  resetSpeakConnection() {
+    this.speakConnection = null
+    this.speakQueue = []
     clearTimeout(this.inactivityTimer)
   }
 
@@ -206,11 +207,11 @@ export class DeepgramService {
       this.listenConnection.removeAllListeners()
       this.listenConnection = null
     }
-    if (this.ttsConnection) {
-      this.ttsConnection.finish()
-      this.ttsConnection = null
+    if (this.speakConnection) {
+      this.speakConnection.finish()
+      this.speakConnection = null
     }
-    this.resetTTSConnection()
+    this.resetSpeakConnection()
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval)
       this.keepAliveInterval = null
