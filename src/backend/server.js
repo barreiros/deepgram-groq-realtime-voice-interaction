@@ -62,8 +62,8 @@ wss.on('connection', (ws, req) => {
   })
 
   eventEmitter.on('llm-text', async ({ text }) => {
-    // ws.send(JSON.stringify({ groqSentence: text }))
-    // await ttsService.synthesizeSpeech(text)
+    ws.send(JSON.stringify({ groqSentence: text }))
+    await ttsService.synthesizeSpeech(text)
     console.log('LLM Text:', text)
   })
 
