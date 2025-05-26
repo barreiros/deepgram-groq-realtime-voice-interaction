@@ -91,11 +91,11 @@ export class DeepgramService {
     try {
       console.log('DeepgramService.synthesizeSpeech called with text:', text)
       const response = await this.dgClient.speak.request(
-        { text },
+        { source: { text } },
         {
-          model: 'aura-angus-en', // Or another suitable voice
-          encoding: 'linear16', // Or 'mp3', 'aac', etc.
-          container: 'wav', // Or 'mp3', 'aac', etc.
+          model: 'aura-angus-en',
+          encoding: 'linear16',
+          container: 'wav',
         }
       )
 
