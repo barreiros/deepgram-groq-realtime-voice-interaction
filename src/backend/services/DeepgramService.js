@@ -6,13 +6,12 @@ export class DeepgramService {
     this.eventEmitter = eventEmitter
     this.params = params
     this.dgClient = createClient(this.apiKey)
-    
+
     this.listenConnection = null
     this.speakConnection = null
-    
+
     this.speakQueue = []
     this.keepAliveInterval = null
-    this.inactivityTimer = null
 
     this.initializeListenConnection()
     this.initializeSpeakConnection()
@@ -25,7 +24,9 @@ export class DeepgramService {
       punctuate: true,
       smart_format: true,
       model: 'nova',
-      sample_rate: this.params?.sample_rate ? parseInt(this.params.sample_rate) : 16000,
+      sample_rate: this.params?.sample_rate
+        ? parseInt(this.params.sample_rate)
+        : 16000,
       channels: this.params?.channels ? parseInt(this.params.channels) : 1,
       ...this.params,
     })
@@ -57,13 +58,6 @@ export class DeepgramService {
       console.log('deepgram: keepalive')
       this.listenConnection?.keepAlive()
     }, 10 * 1000)
-  }
-
-  resetInactivityTimer() {
-    clearTimeout(this.inactivityTimer)
-    this.inactivityTimer = setTimeout(() => {
-      this.speakConnection?.finish()
-    }, 30000)
   }
 
   handleListenOpen() {
@@ -107,7 +101,6 @@ export class DeepgramService {
 
   handleSpeakOpen() {
     console.log('Deepgram TTS connection opened')
-    this.processSpeakText()
   }
 
   handleSpeakError(error) {
@@ -123,7 +116,6 @@ export class DeepgramService {
 
   handleSpeakData(audioChunk) {
     this.eventEmitter.emit('speech', { audio: audioChunk })
-    this.resetInactivityTimer()
   }
 
   createWebSocket(clientWs) {
@@ -138,40 +130,30 @@ export class DeepgramService {
   }
 
   async synthesizeSpeech(text) {
-    if (!this.speakConnection || this.speakConnection.getReadyState() !== 'open') {
+    console.log('DeepgramService synthesizeSpeech', text)
+    if (
+      !this.speakConnection ||
+      this.speakConnection.getReadyState() !== 'open'
+    ) {
       await this.initializeSpeakConnection()
     }
-
-    this.speakQueue.push(text)
-    this.processSpeakText()
+    console.log('DeepgramService synthesizeSpeech B')
+    this.speakConnection.sendText(text)
   }
 
   async initializeSpeakConnection() {
     this.speakConnection = this.dgClient.speak.live({
       model: 'aura-asteria-en',
       encoding: 'linear16',
-      container: 'wav'
+      container: 'wav',
     })
 
     this.setupSpeakHandlers()
-    this.resetInactivityTimer()
-  }
-
-  processSpeakText() {
-    if (!this.speakConnection || this.speakConnection.getReadyState() !== 'open') return
-    if (this.speakQueue.length === 0) return
-
-    while (this.speakQueue.length > 0) {
-      const text = this.speakQueue.shift()
-      this.speakConnection.send(text)
-    }
-    this.speakConnection.finish()
   }
 
   resetSpeakConnection() {
     this.speakConnection = null
     this.speakQueue = []
-    clearTimeout(this.inactivityTimer)
   }
 
   sendMessage(message) {
@@ -190,7 +172,6 @@ export class DeepgramService {
       } else if (this.listenConnection.getReadyState() >= 2) {
         console.log("socket: data couldn't be sent to deepgram")
         console.log('socket: retrying connection to deepgram')
-        this.listenConnection.finish()
         this.listenConnection.removeAllListeners()
         this.initializeListenConnection()
       } else {
@@ -203,14 +184,10 @@ export class DeepgramService {
 
   close() {
     if (this.listenConnection) {
-      this.listenConnection.finish()
       this.listenConnection.removeAllListeners()
       this.listenConnection = null
     }
     if (this.speakConnection) {
-      if (this.speakConnection.getReadyState() === 'open') {
-        this.speakConnection.close()
-      }
       this.speakConnection = null
     }
     this.resetSpeakConnection()

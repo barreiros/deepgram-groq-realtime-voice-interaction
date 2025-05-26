@@ -119,19 +119,35 @@ class GroqService {
       await this.memory.saveContext({ input: textToSend }, { output: '' })
       await this.sendToSilenceService(textToSend)
 
-      const response = await this.chain.stream({ input: textToSend })
-      let fullResponse = ''
+      let llmResponseBuffer = ''
+      const stream = await this.chain.stream({ input: textToSend })
 
-      for await (const item of response) {
-        fullResponse += item
-        this.eventEmitter.emit('llm-text', { text: item })
+      for await (const chunk of stream) {
+        llmResponseBuffer += chunk
+        this.lastActivityTime = Date.now()
+
+        if (SentenceCompletion.isComplete(llmResponseBuffer, this.language)) {
+          this.eventEmitter.emit('llm-text', {
+            text: llmResponseBuffer.trim(),
+            language: this.language
+          })
+          llmResponseBuffer = ''
+        }
+      }
+
+      if (llmResponseBuffer.length > 0) {
+        this.eventEmitter.emit('llm-text', {
+          text: llmResponseBuffer.trim(),
+          language: this.language
+        })
       }
 
       // Save the AI's full response to memory
       await this.memory.saveContext(
         { input: textToSend },
-        { output: fullResponse }
+        { output: llmResponseBuffer }
       )
+      this.startSilenceTimeout()
     } catch (error) {
       console.error('Error processing buffer:', error)
       this.eventEmitter.emit('error', { error: error.message })
