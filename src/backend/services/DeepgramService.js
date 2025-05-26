@@ -89,29 +89,39 @@ export class DeepgramService {
 
   async synthesizeSpeech(text, ws) {
     try {
-      console.log('DeepgramService.synthesizeSpeech called with text:', text)
-      const response = await this.dgClient.speak.request(
-        { source: text },
-        {
-          model: 'aura-angus-en',
-          encoding: 'linear16',
-          container: 'wav',
-        }
-      )
+      console.log('Initializing Deepgram TTS live connection');
+      const connection = this.dgClient.speak.live({
+        model: 'aura-asteria-en',
+        encoding: 'linear16',
+        container: 'wav'
+      });
 
-      const stream = await response.getStream()
-      const chunks = []
-      for await (const chunk of stream) {
-        chunks.push(chunk)
+      connection.on('open', async () => {
+        console.log('Deepgram TTS connection opened');
+        connection.send(text);
+        connection.finish();
+      });
+
+      connection.on('error', (error) => {
+        console.error('Deepgram TTS error:', error);
+        this.eventEmitter.emit('error', { message: 'TTS connection error' });
+      });
+
+      connection.on('close', () => {
+        console.log('Deepgram TTS connection closed');
+      });
+
+      const audioChunks = [];
+      for await (const audioChunk of connection) {
+        audioChunks.push(audioChunk);
       }
-      const data = Buffer.concat(chunks)
+      
+      const audioData = Buffer.concat(audioChunks);
+      this.eventEmitter.emit('speech', { audio: audioData });
 
-      console.log('DeepgramService.synthesizeSpeech received audio data')
-      this.eventEmitter.emit('speech', { audio: data })
     } catch (error) {
-      console.error('Error synthesizing speech with Deepgram:', error)
-      console.error('Deepgram TTS Error Details:', error) // Log the full error object
-      this.eventEmitter.emit('error', { message: 'Error synthesizing speech' })
+      console.error('Error in Deepgram TTS:', error);
+      this.eventEmitter.emit('error', { message: 'TTS synthesis failed' });
     }
   }
 
