@@ -8,6 +8,10 @@ export class DeepgramService {
     this.apiKey = apiKey
     this.eventEmitter = eventEmitter
     this.dgClient = createClient(this.apiKey)
+    
+    this.ttsConnection = null
+    this.ttsQueue = []
+    this.ttsTimeout = null
 
     this.deepgramWs = this.dgClient.listen.live({
       language: params.language || 'en',
@@ -87,42 +91,68 @@ export class DeepgramService {
     return deepgram
   }
 
-  async synthesizeSpeech(text, ws) {
-    try {
-      console.log('Initializing Deepgram TTS live connection');
-      const connection = this.dgClient.speak.live({
-        model: 'aura-asteria-en',
-        encoding: 'linear16',
-        container: 'wav'
-      });
-
-      connection.on('open', async () => {
-        console.log('Deepgram TTS connection opened');
-        connection.send(text);
-        connection.finish();
-      });
-
-      connection.on('error', (error) => {
-        console.error('Deepgram TTS error:', error);
-        this.eventEmitter.emit('error', { message: 'TTS connection error' });
-      });
-
-      connection.on('close', () => {
-        console.log('Deepgram TTS connection closed');
-      });
-
-      const audioChunks = [];
-      for await (const audioChunk of connection) {
-        audioChunks.push(audioChunk);
-      }
-      
-      const audioData = Buffer.concat(audioChunks);
-      this.eventEmitter.emit('speech', { audio: audioData });
-
-    } catch (error) {
-      console.error('Error in Deepgram TTS:', error);
-      this.eventEmitter.emit('error', { message: 'TTS synthesis failed' });
+  async synthesizeSpeech(text) {
+    if (!this.ttsConnection || this.ttsConnection.getReadyState() !== 'open') {
+      await this.initializeTTSConnection()
     }
+
+    this.ttsQueue.push(text)
+    this.processTTSText()
+  }
+
+  async initializeTTSConnection() {
+    this.ttsConnection = this.dgClient.speak.live({
+      model: 'aura-asteria-en',
+      encoding: 'linear16',
+      container: 'wav'
+    })
+
+    this.ttsConnection.on('open', () => {
+      console.log('Deepgram TTS connection opened')
+      this.processTTSText()
+    })
+
+    this.ttsConnection.on('error', (error) => {
+      console.error('Deepgram TTS error:', error)
+      this.eventEmitter.emit('error', { message: 'TTS connection error' })
+      this.resetTTSConnection()
+    })
+
+    this.ttsConnection.on('close', () => {
+      console.log('Deepgram TTS connection closed')
+      this.resetTTSConnection()
+    })
+
+    this.ttsConnection.on('data', (audioChunk) => {
+      this.eventEmitter.emit('speech', { audio: audioChunk })
+      this.resetTTSTimeout()
+    })
+  }
+
+  processTTSText() {
+    if (!this.ttsConnection || this.ttsConnection.getReadyState() !== 'open') return
+    if (this.ttsQueue.length === 0) return
+
+    while (this.ttsQueue.length > 0) {
+      const text = this.ttsQueue.shift()
+      this.ttsConnection.send(text)
+    }
+    this.ttsConnection.finish()
+  }
+
+  resetTTSTimeout() {
+    clearTimeout(this.ttsTimeout)
+    this.ttsTimeout = setTimeout(() => {
+      if (this.ttsConnection) {
+        this.ttsConnection.finish()
+      }
+    }, 30000)
+  }
+
+  resetTTSConnection() {
+    this.ttsConnection = null
+    this.ttsQueue = []
+    clearTimeout(this.ttsTimeout)
   }
 
   sendMessage(message) {
@@ -158,6 +188,11 @@ export class DeepgramService {
       this.deepgramWs.removeAllListeners()
       this.deepgramWs = null
     }
+    if (this.ttsConnection) {
+      this.ttsConnection.finish()
+      this.ttsConnection = null
+    }
+    this.resetTTSConnection()
     if (keepAlive) {
       clearInterval(keepAlive)
       keepAlive = null
