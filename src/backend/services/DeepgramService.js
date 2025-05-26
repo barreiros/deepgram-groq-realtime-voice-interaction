@@ -128,7 +128,7 @@ export class DeepgramService {
       if (this.deepgramWs.getReadyState() === 1) {
         // console.log('socket: data sent to deepgram', message)
         this.deepgramWs.send(message)
-      } else if (deepgram.getReadyState() >= 2) {
+      } else if (this.deepgramWs.getReadyState() >= 2) {
         console.log("socket: data couldn't be sent to deepgram")
         console.log('socket: retrying connection to deepgram')
         this.deepgramWs.finish()
