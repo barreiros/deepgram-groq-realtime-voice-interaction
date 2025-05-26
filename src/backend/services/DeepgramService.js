@@ -208,7 +208,9 @@ export class DeepgramService {
       this.listenConnection = null
     }
     if (this.speakConnection) {
-      this.speakConnection.finish()
+      if (this.speakConnection.getReadyState() === 'open') {
+        this.speakConnection.close()
+      }
       this.speakConnection = null
     }
     this.resetSpeakConnection()
