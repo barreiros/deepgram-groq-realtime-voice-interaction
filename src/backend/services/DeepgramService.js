@@ -39,6 +39,16 @@ export class DeepgramService {
     this.startKeepAlive()
   }
 
+  async initializeSpeakConnection() {
+    console.log('Initializing Deepgram TTS connection')
+    this.speakConnection = this.dgClient.speak.live({
+      model: 'aura-2-thalia-en',
+      encoding: 'linear16',
+    })
+
+    this.setupSpeakHandlers()
+  }
+
   setupListenHandlers() {
     this.listenConnection
       .on(LiveTranscriptionEvents.Open, this.handleListenOpen.bind(this))
@@ -62,6 +72,39 @@ export class DeepgramService {
       console.log('deepgram: keepalive')
       this.listenConnection?.keepAlive()
     }, 10 * 1000)
+  }
+
+  async synthesizeSpeech(text) {
+    console.log('DeepgramService synthesizeSpeech', text)
+    if (!this.speakConnection || this.speakConnection.getReadyState() >= 2) {
+      await this.initializeSpeakConnection()
+    }
+    console.log('DeepgramService synthesizeSpeech B')
+    this.speakConnection.sendText(text)
+    this.speakConnection.flush()
+  }
+
+  resetSpeakConnection() {
+    this.speakConnection = null
+    this.speakQueue = []
+  }
+
+  sendMessage(message) {
+    try {
+      if (this.listenConnection.getReadyState() === 1) {
+        // console.log('socket: data sent to deepgram', message)
+        this.listenConnection.send(message)
+      } else if (this.listenConnection.getReadyState() >= 2) {
+        console.log("socket: data couldn't be sent to deepgram")
+        console.log('socket: retrying connection to deepgram')
+        this.listenConnection.removeAllListeners()
+        this.initializeListenConnection()
+      } else {
+        console.log("socket: data couldn't be sent to deepgram")
+      }
+    } catch (error) {
+      console.error('Error sending audio to Deepgram:', error)
+    }
   }
 
   handleListenOpen() {
@@ -121,68 +164,6 @@ export class DeepgramService {
   handleSpeakData(audioChunk) {
     console.log('Deepgram audio received:', audioChunk)
     this.eventEmitter.emit('speech', { audio: audioChunk })
-  }
-
-  createWebSocket(clientWs) {
-    console.log('DeepgramService.createWebSocket called')
-    let deepgram = this.setupDeepgram(clientWs)
-
-    clientWs.on('close', () => {
-      console.log('socket: client disconnected')
-    })
-
-    return deepgram
-  }
-
-  async synthesizeSpeech(text) {
-    console.log('DeepgramService synthesizeSpeech', text)
-    if (!this.speakConnection || this.speakConnection.getReadyState() >= 2) {
-      await this.initializeSpeakConnection()
-    }
-    console.log('DeepgramService synthesizeSpeech B')
-    this.speakConnection.sendText(text)
-    this.speakConnection.flush()
-  }
-
-  async initializeSpeakConnection() {
-    console.log('Initializing Deepgram TTS connection')
-    this.speakConnection = this.dgClient.speak.live({
-      model: 'aura-2-thalia-en',
-      encoding: 'linear16',
-    })
-
-    this.setupSpeakHandlers()
-  }
-
-  resetSpeakConnection() {
-    this.speakConnection = null
-    this.speakQueue = []
-  }
-
-  sendMessage(message) {
-    try {
-      // console.log(
-      //   'DeepgramService.handleClientMessage called. type:',
-      //   typeof message,
-      //   'isBuffer:',
-      //   Buffer.isBuffer(message),
-      //   'length:',
-      //   message?.length
-      // )
-      if (this.listenConnection.getReadyState() === 1) {
-        // console.log('socket: data sent to deepgram', message)
-        this.listenConnection.send(message)
-      } else if (this.listenConnection.getReadyState() >= 2) {
-        console.log("socket: data couldn't be sent to deepgram")
-        console.log('socket: retrying connection to deepgram')
-        this.listenConnection.removeAllListeners()
-        this.initializeListenConnection()
-      } else {
-        console.log("socket: data couldn't be sent to deepgram")
-      }
-    } catch (error) {
-      console.error('Error sending audio to Deepgram:', error)
-    }
   }
 
   close() {
