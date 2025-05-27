@@ -16,6 +16,7 @@ export class DeepgramService {
 
     this.speakQueue = []
     this.keepAliveInterval = null
+    this.speakCounter = 0
 
     this.initializeListenConnection()
     this.initializeSpeakConnection()
@@ -39,8 +40,7 @@ export class DeepgramService {
     this.startKeepAlive()
   }
 
-  async initializeSpeakConnection() {
-    console.log('Initializing Deepgram TTS connection')
+  initializeSpeakConnection() {
     this.speakConnection = this.dgClient.speak.live({
       model: 'aura-2-thalia-en',
       encoding: 'linear16',
@@ -64,6 +64,7 @@ export class DeepgramService {
       .on(LiveTTSEvents.Open, this.handleSpeakOpen.bind(this))
       .on(LiveTTSEvents.Error, this.handleSpeakError.bind(this))
       .on(LiveTTSEvents.Close, this.handleSpeakClose.bind(this))
+      .on(LiveTTSEvents.Flushed, this.handleSpeakFlush.bind(this))
       .on(LiveTTSEvents.Audio, this.handleSpeakData.bind(this))
   }
 
@@ -76,6 +77,7 @@ export class DeepgramService {
 
   async synthesizeSpeech(text) {
     console.log('DeepgramService synthesizeSpeech', text)
+    this.speakCounter++
     if (!this.speakConnection || this.speakConnection.getReadyState() >= 2) {
       await this.initializeSpeakConnection()
     }
@@ -164,6 +166,15 @@ export class DeepgramService {
   handleSpeakData(audioChunk) {
     console.log('Deepgram audio received:', audioChunk)
     this.eventEmitter.emit('speech', { audio: audioChunk })
+  }
+
+  handleSpeakFlush() {
+    this.speakCounter = Math.max(0, this.speakCounter - 1)
+    
+    if (this.speakCounter > 0) {
+      console.log('Flushing remaining speech requests:', this.speakCounter)
+      this.speakConnection.flush()
+    }
   }
 
   close() {
