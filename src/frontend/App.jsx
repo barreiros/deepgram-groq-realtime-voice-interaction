@@ -64,18 +64,6 @@ export default function App() {
           { type: 'received', text: message.data },
         ])
       }
-
-      // // This part might not be needed anymore if audio comes as raw blobs
-      // if (parsedData.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
-      //   const inlineData =
-      //     parsedData.serverContent.modelTurn.parts[0].inlineData
-      //   if (
-      //     inlineData.mimeType &&
-      //     inlineData.mimeType.startsWith('audio/pcm')
-      //   ) {
-      //     audioPlayback.current.playAudio(inlineData.data, inlineData.mimeType)
-      //   }
-      // }
     } catch (error) {
       console.error('Error handling WebSocket message:', error)
     }
