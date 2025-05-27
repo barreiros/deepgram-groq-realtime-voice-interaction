@@ -34,55 +34,48 @@ export default function App() {
     }
   }, [])
 
-  const handleWebSocketMessage = (data) => {
+  const handleWebSocketMessage = (message) => {
     try {
       // Check if the data is a binary blob (likely audio data)
-      if (data instanceof Blob) {
-        console.log('Received audio blob from WebSocket')
-        // Assuming the audio data is in a playable format (e.g., WAV)
-        audioPlayback.current.playAudio(data)
-        return // Stop processing if it's audio data
-      }
-
-      // Otherwise, process as JSON
-      const parsedData = typeof data === 'string' ? JSON.parse(data) : data
-      setMessages((prev) => [...prev, { type: 'received', text: parsedData }])
-
-      if (parsedData?.toolCall?.functionCalls[0]) {
-        const functionCall = parsedData?.toolCall?.functionCalls[0]
-        if (functionCall.name === 'stream_action') {
-          try {
-            const { action, payload } = functionCall.args
-            const parsedPayload = JSON.parse(payload)
-
-            if (action === 'addNode' || action === 'add_node') {
-              if (sceneAPIRef.current?.addPrimitive) {
-                console.log('Add node', parsedPayload)
-                sceneAPIRef.current.addPrimitive(
-                  parsedPayload.type || 'cube',
-                  parsedPayload.color
-                )
-              } else {
-                console.error('sceneAPI.addPrimitive is not available')
-              }
-            }
-          } catch (error) {
-            console.error('Error processing stream action:', error)
-          }
-        }
-      }
-
-      // This part might not be needed anymore if audio comes as raw blobs
-      if (parsedData.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
-        const inlineData =
-          parsedData.serverContent.modelTurn.parts[0].inlineData
+      if (message.type === 'speech') {
         if (
-          inlineData.mimeType &&
-          inlineData.mimeType.startsWith('audio/pcm')
+          message.data.type === 'Buffer' &&
+          Array.isArray(message.data.data)
         ) {
-          audioPlayback.current.playAudio(inlineData.data, inlineData.mimeType)
+          console.log('Received audio blob from WebSocket', message.data)
+          let uint8Array = new Uint8Array(message.data.data)
+          if (uint8Array.length % 2 !== 0) {
+            uint8Array = uint8Array.slice(0, uint8Array.length - 1)
+          }
+          const int16Array = new Int16Array(
+            uint8Array.buffer,
+            uint8Array.byteOffset,
+            Math.floor(uint8Array.byteLength / 2)
+          )
+          audioPlayback.current.playPcmAudio(int16Array, 24000)
         }
+      } else if (
+        message.type === 'llm-text' ||
+        message.type === 'transcription'
+      ) {
+        console.log('Received text from WebSocket:', message.data)
+        setMessages((prev) => [
+          ...prev,
+          { type: 'received', text: message.data },
+        ])
       }
+
+      // // This part might not be needed anymore if audio comes as raw blobs
+      // if (parsedData.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
+      //   const inlineData =
+      //     parsedData.serverContent.modelTurn.parts[0].inlineData
+      //   if (
+      //     inlineData.mimeType &&
+      //     inlineData.mimeType.startsWith('audio/pcm')
+      //   ) {
+      //     audioPlayback.current.playAudio(inlineData.data, inlineData.mimeType)
+      //   }
+      // }
     } catch (error) {
       console.error('Error handling WebSocket message:', error)
     }

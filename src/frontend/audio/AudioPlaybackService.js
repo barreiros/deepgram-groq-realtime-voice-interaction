@@ -22,6 +22,32 @@ class AudioPlaybackService {
     }
   }
 
+  playPcmAudio(int16Array, sampleRate = 48000) {
+    if (!(int16Array instanceof Int16Array)) {
+      console.error('Invalid PCM data: Expected Int16Array')
+      return
+    }
+
+    // Convert Int16Array to Float32Array
+    const float32Array = new Float32Array(int16Array.length)
+    for (let i = 0; i < int16Array.length; i++) {
+      float32Array[i] = int16Array[i] / 32768 // Convert to [-1.0, 1.0]
+    }
+
+    // Create AudioBuffer: 1 channel (mono), frame count, and sample rate
+    const audioBuffer = this.audioContext.createBuffer(
+      1,
+      float32Array.length,
+      sampleRate
+    )
+
+    // Copy float data into buffer
+    audioBuffer.getChannelData(0).set(float32Array)
+
+    // Add to queue and play
+    this.addToAudioQueue(audioBuffer)
+  }
+
   addToAudioQueue(audioBuffer) {
     this.audioQueue.push(audioBuffer)
     if (!this.isPlaying) {

@@ -141,6 +141,7 @@ export class DeepgramService {
     }
     console.log('DeepgramService synthesizeSpeech B')
     this.speakConnection.sendText(text)
+    this.speakConnection.flush()
   }
 
   async initializeSpeakConnection() {
@@ -148,7 +149,6 @@ export class DeepgramService {
     this.speakConnection = this.dgClient.speak.live({
       model: 'aura-2-thalia-en',
       encoding: 'linear16',
-      sample_rate: 48000,
     })
 
     this.setupSpeakHandlers()

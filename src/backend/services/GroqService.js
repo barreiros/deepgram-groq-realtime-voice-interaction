@@ -104,8 +104,6 @@ class GroqService {
       this.transcriptionBuffer = ''
       await this.processBuffer(completeSentence)
     }
-
-    return ''
   }
 
   async processBuffer(textToSend) {
@@ -129,7 +127,7 @@ class GroqService {
         if (SentenceCompletion.isComplete(llmResponseBuffer, this.language)) {
           this.eventEmitter.emit('llm-text', {
             text: llmResponseBuffer.trim(),
-            language: this.language
+            language: this.language,
           })
           llmResponseBuffer = ''
         }
@@ -138,7 +136,7 @@ class GroqService {
       if (llmResponseBuffer.length > 0) {
         this.eventEmitter.emit('llm-text', {
           text: llmResponseBuffer.trim(),
-          language: this.language
+          language: this.language,
         })
       }
 

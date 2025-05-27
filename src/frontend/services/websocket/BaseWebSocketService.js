@@ -19,15 +19,8 @@ class BaseWebSocketService {
 
     this.ws.onmessage = (event) => {
       try {
-        // Check if the data is a Blob (binary data)
-        if (event.data instanceof Blob) {
-          console.log('Received binary data (Blob) from WebSocket')
-          this.onMessage(event.data) // Pass the raw Blob
-        } else {
-          // Otherwise, assume it's a JSON string
-          const data = JSON.parse(event.data)
-          this.onMessage(data)
-        }
+        const data = JSON.parse(event.data)
+        this.onMessage(data)
       } catch (error) {
         console.error('Error handling WebSocket message:', error)
       }
