@@ -28,7 +28,7 @@ export class DeepgramService {
       language: this.params.language || 'en',
       punctuate: true,
       smart_format: true,
-      model: 'nova',
+      model: 'nova-3',
       sample_rate: this.params?.sample_rate
         ? parseInt(this.params.sample_rate)
         : 16000,
@@ -169,11 +169,14 @@ export class DeepgramService {
   }
 
   handleSpeakFlush() {
+    console.log('Deepgram TTS flush event received')
     this.speakCounter = Math.max(0, this.speakCounter - 1)
-    
+
     if (this.speakCounter > 0) {
       console.log('Flushing remaining speech requests:', this.speakCounter)
       this.speakConnection.flush()
+    } else {
+      this.speakConnection.sendText('')
     }
   }
 
