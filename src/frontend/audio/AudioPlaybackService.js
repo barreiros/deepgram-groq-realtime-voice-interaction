@@ -32,7 +32,7 @@ class AudioPlaybackService {
       float32Array[i] = int16Array[i] / 32768
     }
 
-    this.processAudioChunk(float32Array, sampleRate).then(audioBuffer => {
+    this.processAudioChunk(float32Array, sampleRate).then((audioBuffer) => {
       if (audioBuffer) {
         this.addToAudioQueue(audioBuffer)
       }
@@ -49,6 +49,15 @@ class AudioPlaybackService {
   playNextInQueue() {
     if (this.queue.length === 0) {
       this.isPlaying = false
+
+      if (this.currentWordBuffer.length > 0) {
+        this.flushWordBuffer(24000).then((audioBuffer) => {
+          if (audioBuffer) {
+            this.addToAudioQueue(audioBuffer)
+          }
+        })
+      }
+
       return
     }
 
@@ -57,19 +66,19 @@ class AudioPlaybackService {
     const source = this.audioContext.createBufferSource()
     source.buffer = audioBuffer
     source.connect(this.audioContext.destination)
-    
+
     source.onended = () => {
       this.playNextInQueue()
     }
-    
+
     source.start(0)
   }
 
   async processAudioChunk(floatArray, sampleRate) {
     this.currentWordBuffer.push(floatArray)
-    
+
     let silentSamples = 0
-    const checkLength = Math.min(floatArray.length, sampleRate/10)
+    const checkLength = Math.min(floatArray.length, sampleRate / 10)
     for (let i = floatArray.length - checkLength; i < floatArray.length; i++) {
       if (Math.abs(floatArray[i]) < this.silenceThreshold) {
         silentSamples++
@@ -84,28 +93,28 @@ class AudioPlaybackService {
 
   async flushWordBuffer(sampleRate) {
     if (this.currentWordBuffer.length === 0) return null
-    
+
     const totalLength = this.currentWordBuffer.reduce(
       (sum, chunk) => sum + chunk.length,
       0
     )
-    
+
     const combinedArray = new Float32Array(totalLength)
     let offset = 0
-    
+
     for (const chunk of this.currentWordBuffer) {
       combinedArray.set(chunk, offset)
       offset += chunk.length
     }
-    
+
     this.currentWordBuffer = []
-    
+
     const audioBuffer = this.audioContext.createBuffer(
-      1, 
+      1,
       combinedArray.length,
       sampleRate
     )
-    
+
     audioBuffer.getChannelData(0).set(combinedArray)
     return audioBuffer
   }
