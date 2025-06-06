@@ -71,13 +71,11 @@ export default function App() {
       } else if (message.type === 'shutup') {
         console.log('Shutup event received:', message.data)
         if (audioPlayback.current) {
-          audioPlayback.current.queue = []
-          audioPlayback.current.currentWordBuffer = []
-          audioPlayback.current.isPlaying = false
+          audioPlayback.current.stopPlayback()
         }
         setMessages((prev) => [
           ...prev,
-          { type: 'system', text: 'Audio playback stopped' },
+          { type: 'system', text: 'Continuing conversation...' },
         ])
       }
     } catch (error) {

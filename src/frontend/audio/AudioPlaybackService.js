@@ -8,6 +8,7 @@ class AudioPlaybackService {
     this.silenceFrames = 0
     this.minSilenceFrames = 1600
     this.sampleRate = sampleRate
+    this.currentSource = null
   }
 
   async playAudio(audioBlob) {
@@ -68,11 +69,29 @@ class AudioPlaybackService {
     source.buffer = audioBuffer
     source.connect(this.audioContext.destination)
 
+    this.currentSource = source
+
     source.onended = () => {
+      this.currentSource = null
       this.playNextInQueue()
     }
 
     source.start(0)
+  }
+
+  stopPlayback() {
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop()
+        this.currentSource = null
+      } catch (error) {
+        console.log('Audio source already stopped')
+      }
+    }
+    
+    this.queue = []
+    this.currentWordBuffer = []
+    this.isPlaying = false
   }
 
   async processAudioChunk(floatArray, sampleRate) {
