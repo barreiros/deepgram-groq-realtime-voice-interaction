@@ -1,18 +1,18 @@
 export class AudioRecordingService {
-  constructor(socket) {
-    this.socket = socket
+  constructor(options = {}) {
+    this.onMessage = options.onMessage
     this.mediaRecorder = null
     this.isRecording = false
-    this.onVolumeChange = null // Callback for volume changes (optional)
-    this.onStatusChange = null // Callback for status updates
+    this.onVolumeChange = null
+    this.onStatusChange = null
     this.stream = null
     this.audioContext = null
     this.analyser = null
     this.source = null
-    this.isAudible = false // Flag to track if sound is detected
-    this.analysisInterval = null // Interval ID for analysis loop
-    this.silenceThreshold = 8 // Increased threshold to make filter less sensitive
-    this.initialChunkSent = false // Flag to ensure the first chunk is always sent
+    this.isAudible = false
+    this.analysisInterval = null
+    this.silenceThreshold = 8
+    this.initialChunkSent = false
   }
 
   async startRecording() {
@@ -23,19 +23,16 @@ export class AudioRecordingService {
 
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-      // --- Setup Audio Analysis ---
       this.audioContext = new (window.AudioContext ||
         window.webkitAudioContext)()
       this.analyser = this.audioContext.createAnalyser()
-      this.analyser.fftSize = 256 // Smaller FFT size for faster analysis
+      this.analyser.fftSize = 256
       const bufferLength = this.analyser.frequencyBinCount
       const dataArray = new Uint8Array(bufferLength)
 
       this.source = this.audioContext.createMediaStreamSource(this.stream)
       this.source.connect(this.analyser)
-      // Note: We don't connect analyser to destination, it just monitors
 
-      // Start analysis loop
       this.analysisInterval = setInterval(() => {
         if (!this.isRecording || !this.analyser) return
         this.analyser.getByteFrequencyData(dataArray)
@@ -46,22 +43,19 @@ export class AudioRecordingService {
         const average = sum / bufferLength
         this.isAudible = average > this.silenceThreshold
 
-        // Optional: Call volume change callback
         if (this.onVolumeChange) {
           this.onVolumeChange(average)
         }
-      }, 100) // Check volume every 100ms
-      // --- End Audio Analysis Setup ---
+      }, 100)
 
-      this.mediaRecorder = new window.MediaRecorder(this.stream) // Use the original stream
-      this.initialChunkSent = false // Reset flag on new recording start
+      this.mediaRecorder = new window.MediaRecorder(this.stream)
+      this.initialChunkSent = false
 
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0 && this.isRecording) {
-          // Send the first chunk regardless of silence, then filter subsequent chunks
           if (!this.initialChunkSent || this.isAudible) {
             this.sendAudioData(event.data)
-            this.initialChunkSent = true // Mark initial chunk as sent
+            this.initialChunkSent = true
           }
         }
       }
@@ -95,14 +89,13 @@ export class AudioRecordingService {
     if (this.mediaRecorder && this.isRecording) {
       this.mediaRecorder.stop()
       this.isRecording = false
-      this.initialChunkSent = false // Reset flag on stop
-      // Stop analysis loop
+      this.initialChunkSent = false
+
       if (this.analysisInterval) {
         clearInterval(this.analysisInterval)
         this.analysisInterval = null
       }
 
-      // Disconnect and close audio context
       if (this.source) {
         this.source.disconnect()
         this.source = null
@@ -124,10 +117,13 @@ export class AudioRecordingService {
   }
 
   sendAudioData(audioData) {
-    if (!this.socket) return
+    if (!this.onMessage) return
 
     try {
-      this.socket.sendAudioData(audioData)
+      this.onMessage({
+        type: 'audioData',
+        data: audioData
+      })
     } catch (error) {
       console.error('Error sending audio data:', error)
     }

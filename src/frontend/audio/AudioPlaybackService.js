@@ -1,5 +1,5 @@
 class AudioPlaybackService {
-  constructor() {
+  constructor(sampleRate = 24000) {
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
     this.queue = []
     this.isPlaying = false
@@ -7,6 +7,7 @@ class AudioPlaybackService {
     this.silenceThreshold = 0.01
     this.silenceFrames = 0
     this.minSilenceFrames = 1600
+    this.sampleRate = sampleRate
   }
 
   async playAudio(audioBlob) {
@@ -26,13 +27,13 @@ class AudioPlaybackService {
     }
   }
 
-  playPcmAudio(int16Array, sampleRate = 24000) {
+  playPcmAudio(int16Array) {
     const float32Array = new Float32Array(int16Array.length)
     for (let i = 0; i < int16Array.length; i++) {
       float32Array[i] = int16Array[i] / 32768
     }
 
-    this.processAudioChunk(float32Array, sampleRate).then((audioBuffer) => {
+    this.processAudioChunk(float32Array, this.sampleRate).then((audioBuffer) => {
       if (audioBuffer) {
         this.addToAudioQueue(audioBuffer)
       }
@@ -51,7 +52,7 @@ class AudioPlaybackService {
       this.isPlaying = false
 
       if (this.currentWordBuffer.length > 0) {
-        this.flushWordBuffer(24000).then((audioBuffer) => {
+        this.flushWordBuffer(this.sampleRate).then((audioBuffer) => {
           if (audioBuffer) {
             this.addToAudioQueue(audioBuffer)
           }

@@ -13,10 +13,7 @@ export default function App() {
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
   const sceneAPIRef = useRef(null)
-
-  const handleSceneReady = (api) => {
-    sceneAPIRef.current = api
-  }
+  const sampleRate = 24000
 
   useEffect(() => {
     if (!ws.current) {
@@ -25,7 +22,7 @@ export default function App() {
       })
     }
     if (!audioPlayback.current) {
-      audioPlayback.current = new AudioPlaybackService()
+      audioPlayback.current = new AudioPlaybackService(sampleRate)
     }
     return () => {
       if (audioService.current) {
@@ -34,9 +31,18 @@ export default function App() {
     }
   }, [])
 
+  const handleSceneReady = (api) => {
+    sceneAPIRef.current = api
+  }
+
+  const handleAudioRecordingMessage = (message) => {
+    if (message.type === 'audioData' && ws.current) {
+      ws.current.sendAudioData(message.data)
+    }
+  }
+
   const handleWebSocketMessage = (message) => {
     try {
-      // Check if the data is a binary blob (likely audio data)
       if (message.type === 'speech') {
         if (
           message.data.type === 'Buffer' &&
@@ -52,7 +58,7 @@ export default function App() {
             uint8Array.byteOffset,
             Math.floor(uint8Array.byteLength / 2)
           )
-          audioPlayback.current.playPcmAudio(int16Array, 24000)
+          audioPlayback.current.playPcmAudio(int16Array)
         }
       } else if (
         message.type === 'llm-text' ||
@@ -69,19 +75,6 @@ export default function App() {
     }
   }
 
-  const handleSendMessage = (e) => {
-    e.preventDefault()
-    if (inputMessage.trim()) {
-      setMessages((prev) => [...prev, { type: 'sent', text: inputMessage }])
-      ws.current.sendMessage({
-        realtimeInput: {
-          mediaChunks: [inputMessage],
-        },
-      })
-      setInputMessage('')
-    }
-  }
-
   const toggleRecording = async () => {
     if (!ws.current) {
       setMessages((prev) => [
@@ -92,7 +85,9 @@ export default function App() {
     }
 
     if (!audioService.current) {
-      audioService.current = new AudioRecordingService(ws.current)
+      audioService.current = new AudioRecordingService({
+        onMessage: handleAudioRecordingMessage,
+      })
       audioService.current.onVolumeChange = (volume) => {
         const scaledVolume = Math.min(100, Math.floor(volume * 100))
         if (scaledVolume > 5) {
