@@ -6,7 +6,6 @@ import AudioPlaybackService from './audio/AudioPlaybackService'
 
 export default function App() {
   const [messages, setMessages] = useState([])
-  const [inputMessage, setInputMessage] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [audioStatus, setAudioStatus] = useState('')
   const ws = useRef(null)
