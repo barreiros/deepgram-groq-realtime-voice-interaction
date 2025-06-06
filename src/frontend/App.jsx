@@ -68,6 +68,17 @@ export default function App() {
           ...prev,
           { type: 'received', text: message.data },
         ])
+      } else if (message.type === 'shutup') {
+        console.log('Shutup event received:', message.data)
+        if (audioPlayback.current) {
+          audioPlayback.current.queue = []
+          audioPlayback.current.currentWordBuffer = []
+          audioPlayback.current.isPlaying = false
+        }
+        setMessages((prev) => [
+          ...prev,
+          { type: 'system', text: 'Audio playback stopped' },
+        ])
       }
     } catch (error) {
       console.error('Error handling WebSocket message:', error)
@@ -139,6 +150,8 @@ export default function App() {
                   ? 'bg-blue-500 self-end'
                   : msg.type === 'received'
                   ? 'bg-zinc-700 self-start'
+                  : msg.type === 'system'
+                  ? 'bg-yellow-600 self-center text-center'
                   : 'bg-red-600 self-start'
               }`}
             >

@@ -82,6 +82,11 @@ wss.on('connection', (ws, req) => {
     ws.send(JSON.stringify({ type: 'speech', data: audio }))
   })
 
+  eventEmitter.on('shutup', ({ message }) => {
+    console.log('Shutup requested:', message)
+    ws.send(JSON.stringify({ type: 'shutup', data: message }))
+  })
+
   ws.send(
     JSON.stringify({
       type: 'connection',
