@@ -16,6 +16,7 @@ class GroqService {
     this.language = params.langugage || 'en'
     this.lastActivityTime = Date.now()
     this.silenceTimeout = null
+    this.transcriptionBuffer = ''
     this.model = new ChatGroq({
       apiKey: apiKey,
       model:
@@ -44,6 +45,7 @@ class GroqService {
       name: 'stop_conversation',
       description: 'Stop the current conversation buffer and interrupt the model speech when the user wants to interrupt',
       func: async () => {
+        this.clearBuffers()
         this.eventEmitter.emit('shutup', {
           message: 'Conversation stopped by user request'
         })
@@ -55,12 +57,24 @@ class GroqService {
       name: 'change_topic',
       description: 'Use this when the user wants to change the conversation topic or interrupt to discuss something else. This tool helps identify the new topic and respond appropriately.',
       func: async (input) => {
+        this.clearBuffers()
+        this.eventEmitter.emit('shutup', {
+          message: 'Topic change detected'
+        })
         const topicAnalysis = await this.analyzeTopicChange(input)
         return `Topic change detected: ${topicAnalysis}`
       }
     })
 
     return [stopConversationTool, changeTopicTool]
+  }
+
+  clearBuffers() {
+    this.transcriptionBuffer = ''
+    if (this.silenceTimeout) {
+      clearTimeout(this.silenceTimeout)
+      this.silenceTimeout = null
+    }
   }
 
   async analyzeTopicChange(userInput) {

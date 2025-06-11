@@ -78,12 +78,18 @@ wss.on('connection', (ws, req) => {
   })
 
   eventEmitter.on('speech', ({ audio }) => {
-    console.log('Send speech audio to client:', audio)
+    // console.log('Send speech audio to client:', audio)
     ws.send(JSON.stringify({ type: 'speech', data: audio }))
   })
 
   eventEmitter.on('shutup', ({ message }) => {
     console.log('Shutup requested:', message)
+    if (sttService && sttService.clearBuffers) {
+      sttService.clearBuffers()
+    }
+    if (ttsService && ttsService.clearBuffers && ttsService !== sttService) {
+      ttsService.clearBuffers()
+    }
     ws.send(JSON.stringify({ type: 'shutup', data: message }))
   })
 
@@ -96,7 +102,7 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', (message) => {
     try {
-      console.log('Received message from client:', message)
+      // console.log('Received message from client:', message)
       sttService.sendMessage(message)
     } catch (error) {
       console.error('Error processing message:', error)

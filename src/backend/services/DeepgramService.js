@@ -75,6 +75,14 @@ export class DeepgramService {
     }, 10 * 1000)
   }
 
+  clearBuffers() {
+    this.speakQueue = []
+    this.speakCounter = 0
+    if (this.speakConnection && this.speakConnection.getReadyState() === 1) {
+      this.speakConnection.sendText('')
+    }
+  }
+
   async synthesizeSpeech(text) {
     console.log('DeepgramService synthesizeSpeech', text)
     this.speakCounter++
@@ -114,7 +122,7 @@ export class DeepgramService {
   }
 
   handleTranscript(data) {
-    console.log('deepgram: packet received', data)
+    // console.log('deepgram: packet received', data)
 
     if (data.channel.alternatives[0]?.transcript) {
       const transcription = data.channel.alternatives[0].transcript
@@ -142,9 +150,7 @@ export class DeepgramService {
   }
 
   handleMetadata(data) {
-    console.log('deepgram: packet received')
-    console.log('deepgram: metadata received')
-    console.log('ws: metadata sent to client')
+    // console.log('deepgram: packet received')
     this.eventEmitter.emit('metadata', { metadata: data })
   }
 
@@ -164,7 +170,7 @@ export class DeepgramService {
   }
 
   handleSpeakData(audioChunk) {
-    console.log('Deepgram audio received:', audioChunk)
+    // console.log('Deepgram audio received:', audioChunk)
     this.eventEmitter.emit('speech', { audio: audioChunk })
   }
 
