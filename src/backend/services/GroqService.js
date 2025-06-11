@@ -145,10 +145,6 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
     }
   }
 
-  async sendToSilenceService(content) {
-    console.log('Sending to silence service:', content)
-  }
-
   async processTranscription(transcription) {
     this.lastActivityTime = Date.now()
     const spacedTranscription = this.transcriptionBuffer
@@ -177,14 +173,12 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       SentenceCompletion.isComplete(textToSend)
     )
     try {
-      await this.sendToSilenceService(textToSend)
-
       const toolsResult = await this.toolsAgentExecutor.invoke({
         input: textToSend,
       })
 
       if (toolsResult.output !== 'no_tools_needed') {
-        console.log('Tools were called, skipping conversation response')
+        console.log('Shutup tool was called, skipping conversation response')
         return
       }
 
