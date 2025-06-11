@@ -78,6 +78,7 @@ export class DeepgramService {
   clearBuffers() {
     this.speakQueue = []
     this.speakCounter = 0
+    this.speakConnection.clear()
     if (this.speakConnection && this.speakConnection.getReadyState() === 1) {
       this.speakConnection.sendText('')
     }
@@ -89,7 +90,6 @@ export class DeepgramService {
     if (!this.speakConnection || this.speakConnection.getReadyState() >= 2) {
       await this.initializeSpeakConnection()
     }
-    console.log('DeepgramService synthesizeSpeech B')
     this.speakConnection.sendText(text)
     this.speakConnection.flush()
   }

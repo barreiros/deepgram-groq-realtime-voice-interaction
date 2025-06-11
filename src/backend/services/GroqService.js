@@ -53,7 +53,6 @@ class GroqService {
       description:
         'Stop the current conversation buffer and interrupt the model speech when the user wants to interrupt',
       func: async () => {
-        this.clearBuffers()
         this.eventEmitter.emit('shutup', {
           message: 'Conversation stopped by user request',
         })
@@ -74,7 +73,7 @@ Analyze the user's input and decide if you should call the stop_conversation too
 
 Call stop_conversation when the user explicitly asks to:
 - "Stop"
-- "Pause" 
+- "Pause"
 - "Wait"
 - "Hold on"
 - "Interrupt"

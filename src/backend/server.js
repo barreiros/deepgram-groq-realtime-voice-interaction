@@ -90,6 +90,9 @@ wss.on('connection', (ws, req) => {
     if (ttsService && ttsService.clearBuffers && ttsService !== sttService) {
       ttsService.clearBuffers()
     }
+    if (groqService && groqService.clearBuffers) {
+      groqService.clearBuffers()
+    }
     ws.send(JSON.stringify({ type: 'shutup', data: message }))
   })
 

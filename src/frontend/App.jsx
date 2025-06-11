@@ -19,11 +19,11 @@ export default function App() {
   const sampleRate = 24000
 
   const testMessages = [
-    'Hello, Deepgram',
+    // 'Hello, Deepgram',
     'Tell me 20 city names',
     'Stop talking',
-    'Tell me a joke',
-    'Shut up',
+    // 'Tell me a joke',
+    // 'Shut up',
   ]
 
   const scrollToBottom = () => {
@@ -199,19 +199,16 @@ export default function App() {
       ])
     } else {
       let messageIndex = 0
-      
-      // Send first message immediately
-      const firstMessage = testMessages[messageIndex]
+      const message = testMessages[messageIndex]
       ws.current.sendMessage({
         type: 'timer-message',
-        data: firstMessage,
+        data: message,
       })
       setMessages((prev) => [
         ...prev,
-        { type: 'sent', text: `Timer: ${firstMessage}` },
+        { type: 'sent', text: `Timer: ${message}` },
       ])
       messageIndex++
-
       timerRef.current = setInterval(() => {
         if (messageIndex < testMessages.length) {
           const message = testMessages[messageIndex]
@@ -235,7 +232,7 @@ export default function App() {
             { type: 'system', text: 'Timer completed all messages' },
           ])
         }
-      }, 5000)
+      }, 10000)
 
       setIsTimerActive(true)
       setMessages((prev) => [
