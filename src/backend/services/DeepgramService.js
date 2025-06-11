@@ -78,9 +78,12 @@ export class DeepgramService {
   clearBuffers() {
     this.speakQueue = []
     this.speakCounter = 0
-    this.speakConnection.clear()
     if (this.speakConnection && this.speakConnection.getReadyState() === 1) {
+      this.speakConnection.clear()
       this.speakConnection.sendText('')
+    }
+    if (this.listenConnection && this.listenConnection.getReadyState() === 1) {
+      this.listenConnection.finalize()
     }
   }
 
