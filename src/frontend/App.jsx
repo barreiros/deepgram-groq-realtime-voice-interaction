@@ -7,12 +7,46 @@ import AudioPlaybackService from './audio/AudioPlaybackService'
 export default function App() {
   const [messages, setMessages] = useState([])
   const [isRecording, setIsRecording] = useState(false)
+  const [isTimerActive, setIsTimerActive] = useState(false)
   const [audioStatus, setAudioStatus] = useState('')
   const ws = useRef(null)
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
   const sceneAPIRef = useRef(null)
+  const timerRef = useRef(null)
+  const messagesContainerRef = useRef(null)
+  const lastScrollTime = useRef(Date.now())
   const sampleRate = 24000
+
+  const testMessages = [
+    'Hello, Deepgram',
+    'Tell me 20 city names',
+    'Stop talking',
+    'Tell me a joke',
+    'Shut up',
+  ]
+
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current
+      const now = Date.now()
+      const timeSinceLastScroll = now - lastScrollTime.current
+
+      if (timeSinceLastScroll > 2000) {
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight
+        }, 0)
+      }
+    }
+  }
+
+  const handleScroll = () => {
+    lastScrollTime.current = Date.now()
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   useEffect(() => {
     if (!ws.current) {
@@ -32,6 +66,9 @@ export default function App() {
     return () => {
       if (audioService.current) {
         audioService.current.stopRecording()
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
       }
     }
   }, [])
@@ -53,7 +90,7 @@ export default function App() {
           message.data.type === 'Buffer' &&
           Array.isArray(message.data.data)
         ) {
-          console.log('Received audio blob from WebSocket', message.data)
+          // console.log('Received audio blob from WebSocket', message.data)
           let uint8Array = new Uint8Array(message.data.data)
           if (uint8Array.length % 2 !== 0) {
             uint8Array = uint8Array.slice(0, uint8Array.length - 1)
@@ -141,11 +178,85 @@ export default function App() {
     }
   }
 
+  const toggleTimer = () => {
+    if (!ws.current) {
+      setMessages((prev) => [
+        ...prev,
+        { type: 'error', text: 'Cannot start timer: Not connected to server' },
+      ])
+      return
+    }
+
+    if (isTimerActive) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+      setIsTimerActive(false)
+      setMessages((prev) => [
+        ...prev,
+        { type: 'system', text: 'Timer stopped' },
+      ])
+    } else {
+      let messageIndex = 0
+      
+      // Send first message immediately
+      const firstMessage = testMessages[messageIndex]
+      ws.current.sendMessage({
+        type: 'timer-message',
+        data: firstMessage,
+      })
+      setMessages((prev) => [
+        ...prev,
+        { type: 'sent', text: `Timer: ${firstMessage}` },
+      ])
+      messageIndex++
+
+      timerRef.current = setInterval(() => {
+        if (messageIndex < testMessages.length) {
+          const message = testMessages[messageIndex]
+          ws.current.sendMessage({
+            type: 'timer-message',
+            data: message,
+          })
+          setMessages((prev) => [
+            ...prev,
+            { type: 'sent', text: `Timer: ${message}` },
+          ])
+          messageIndex++
+        } else {
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+            timerRef.current = null
+          }
+          setIsTimerActive(false)
+          setMessages((prev) => [
+            ...prev,
+            { type: 'system', text: 'Timer completed all messages' },
+          ])
+        }
+      }, 5000)
+
+      setIsTimerActive(true)
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: 'system',
+          text: 'Timer started - sending messages every 5 seconds',
+        },
+      ])
+    }
+  }
+
   return (
     <div className="m-0 p-0 overflow-hidden h-full">
       <Scene onSceneReady={handleSceneReady} />
       <div className="fixed bottom-5 right-5 w-[300px] bg-black/80 rounded-lg p-4 text-white max-h-[400px] flex flex-col">
-        <div className="flex-1 overflow-y-auto mb-2.5 flex flex-col gap-2 max-h-[300px] scrollbar-none">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto mb-2.5 flex flex-col gap-2 max-h-[300px] scrollbar-none"
+        >
           {messages.map((msg, index) => (
             <div
               key={index}
@@ -187,6 +298,21 @@ export default function App() {
               }`}
             ></span>
             {isRecording ? 'Stop Recording' : 'Record Audio'}
+          </button>
+          <button
+            className={`w-full flex items-center justify-center gap-2 py-2.5 px-2.5 border-none rounded text-white cursor-pointer transition-colors ${
+              isTimerActive
+                ? 'bg-orange-600 animate-[pulse_1.5s_infinite]'
+                : 'bg-zinc-700 hover:bg-zinc-600'
+            }`}
+            onClick={toggleTimer}
+          >
+            <span
+              className={`w-3 h-3 rounded-full bg-white ${
+                isTimerActive ? 'animate-[blink_1s_infinite]' : ''
+              }`}
+            ></span>
+            {isTimerActive ? 'Stop Timer' : 'Start Timer'}
           </button>
         </div>
       </div>

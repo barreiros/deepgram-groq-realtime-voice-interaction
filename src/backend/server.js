@@ -102,8 +102,20 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', (message) => {
     try {
-      // console.log('Received message from client:', message)
-      sttService.sendMessage(message)
+      let parsedMessage
+      try {
+        parsedMessage = JSON.parse(message.toString())
+      } catch (jsonError) {
+        sttService.sendMessage(message)
+        return
+      }
+
+      if (parsedMessage.type === 'timer-message') {
+        console.log('Received timer message:', parsedMessage.data)
+        groqService.processTranscription(parsedMessage.data)
+      } else {
+        sttService.sendMessage(message)
+      }
     } catch (error) {
       console.error('Error processing message:', error)
       ws.send(

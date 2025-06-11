@@ -34,11 +34,13 @@ class AudioPlaybackService {
       float32Array[i] = int16Array[i] / 32768
     }
 
-    this.processAudioChunk(float32Array, this.sampleRate).then((audioBuffer) => {
-      if (audioBuffer) {
-        this.addToAudioQueue(audioBuffer)
+    this.processAudioChunk(float32Array, this.sampleRate).then(
+      (audioBuffer) => {
+        if (audioBuffer) {
+          this.addToAudioQueue(audioBuffer)
+        }
       }
-    })
+    )
   }
 
   addToAudioQueue(audioBuffer) {
@@ -80,7 +82,9 @@ class AudioPlaybackService {
   }
 
   stopPlayback() {
+    console.log('Stopping audio playback')
     if (this.currentSource) {
+      console.log('Stopping current audio source')
       try {
         this.currentSource.stop()
         this.currentSource = null
@@ -88,7 +92,7 @@ class AudioPlaybackService {
         console.log('Audio source already stopped')
       }
     }
-    
+
     this.queue = []
     this.currentWordBuffer = []
     this.isPlaying = false
