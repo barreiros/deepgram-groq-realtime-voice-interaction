@@ -31,7 +31,7 @@ class GroqService {
 
     this.shutupModel = new ChatGroq({
       apiKey: apiKey,
-      model: 'llama3-70b-8192',
+      model: 'qwen-qwq-32b',
       temperature: 0.1,
     })
 
@@ -185,11 +185,12 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
         return
       }
 
-      const chatHistory = await this.memory.loadMemoryVariables({})
+      // const chatHistory = await this.memory.loadMemoryVariables({})
 
       const response = await this.conversationChain.invoke({
         input: textToSend,
-        chat_history: chatHistory.history || [],
+        // chat_history: chatHistory.history || [],
+        chat_history: [],
       })
 
       if (response && response.trim().length > 0) {

@@ -19,8 +19,9 @@ export default function App() {
   const sampleRate = 24000
 
   const testMessages = [
-    // 'Hello, Deepgram',
-    'Tell me 20 city names',
+    'Hello, how are you?',
+    'I just want to chat with you',
+    'Tell the name of 20 cities in the world',
     'Stop talking',
     // 'Tell me a joke',
     // 'Shut up',
