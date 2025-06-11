@@ -28,7 +28,7 @@ export class DeepgramService {
       language: this.params.language || 'en',
       punctuate: true,
       smart_format: true,
-      model: 'nova-3',
+      model: this.params.model || 'nova-3',
       sample_rate: this.params?.sample_rate
         ? parseInt(this.params.sample_rate)
         : 16000,

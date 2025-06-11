@@ -16,9 +16,15 @@ export default function App() {
 
   useEffect(() => {
     if (!ws.current) {
-      ws.current = new DeepgramWebSocketService({
-        onMessage: handleWebSocketMessage,
-      })
+      ws.current = new DeepgramWebSocketService(
+        {
+          onMessage: handleWebSocketMessage,
+        },
+        {
+          language: 'en',
+          model: 'nova-2-meeting',
+        }
+      )
     }
     if (!audioPlayback.current) {
       audioPlayback.current = new AudioPlaybackService(sampleRate)

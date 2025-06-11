@@ -5,7 +5,6 @@ import {
 } from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import { ConversationSummaryBufferMemory } from 'langchain/memory'
-import { RunnableSequence } from '@langchain/core/runnables'
 import { DynamicTool } from '@langchain/core/tools'
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
 import SentenceCompletion from '../tools/SentenceCompletion.js'
@@ -20,7 +19,8 @@ class GroqService {
     this.model = new ChatGroq({
       apiKey: apiKey,
       model:
-        this.params.model || 'meta-llama/llama-4-maverick-17b-128e-instruct',
+        this.params.groq_model ||
+        'meta-llama/llama-4-maverick-17b-128e-instruct',
       temperature: this.params.temp ? parseFloat(this.params.temp) : 0.7,
     })
 
@@ -43,27 +43,29 @@ class GroqService {
   createTools() {
     const stopConversationTool = new DynamicTool({
       name: 'stop_conversation',
-      description: 'Stop the current conversation buffer and interrupt the model speech when the user wants to interrupt',
+      description:
+        'Stop the current conversation buffer and interrupt the model speech when the user wants to interrupt',
       func: async () => {
         this.clearBuffers()
         this.eventEmitter.emit('shutup', {
-          message: 'Conversation stopped by user request'
+          message: 'Conversation stopped by user request',
         })
         return 'Conversation buffer stopped successfully'
-      }
+      },
     })
 
     const changeTopicTool = new DynamicTool({
       name: 'change_topic',
-      description: 'Use this when the user wants to change the conversation topic or interrupt to discuss something else. This tool helps identify the new topic and respond appropriately.',
+      description:
+        'Use this when the user wants to change the conversation topic or interrupt to discuss something else. This tool helps identify the new topic and respond appropriately.',
       func: async (input) => {
         this.clearBuffers()
         this.eventEmitter.emit('shutup', {
-          message: 'Topic change detected'
+          message: 'Topic change detected',
         })
         const topicAnalysis = await this.analyzeTopicChange(input)
         return `Topic change detected: ${topicAnalysis}`
-      }
+      },
     })
 
     return [stopConversationTool, changeTopicTool]
@@ -81,17 +83,19 @@ class GroqService {
     try {
       const analysisPrompt = ChatPromptTemplate.fromTemplate(`
         Analyze this user input to determine if they want to change topics or interrupt the conversation:
-        
+
         User input: "{input}"
-        
+
         If the user is clearly changing topics, identify the new topic they want to discuss.
         If the topic change is unclear or vague, return "unclear_topic".
-        
+
         Respond with just the topic name or "unclear_topic".
       `)
 
-      const analysisChain = analysisPrompt.pipe(this.memoryModel).pipe(new StringOutputParser())
-      
+      const analysisChain = analysisPrompt
+        .pipe(this.memoryModel)
+        .pipe(new StringOutputParser())
+
       const result = await analysisChain.invoke({ input: userInput })
       return result.trim()
     } catch (error) {
@@ -104,7 +108,7 @@ class GroqService {
     this.prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `You are a helpful english tutor. Please, make short responses. 
+        `You are a helpful english tutor. Please, make short responses.
 
 You have access to tools that can help you manage the conversation:
 - Use the stop_conversation tool when the user explicitly asks to stop, interrupt, or pause the conversation.
@@ -194,7 +198,7 @@ Pay attention to interruption signals like:
     )
     try {
       const chatHistory = await this.memory.loadMemoryVariables({})
-      
+
       await this.sendToSilenceService(textToSend)
 
       const result = await this.agentExecutor.invoke({
@@ -203,10 +207,10 @@ Pay attention to interruption signals like:
       })
 
       const response = result.output
-      
+
       if (response && response.trim().length > 0) {
         let llmResponseBuffer = response
-        
+
         if (SentenceCompletion.isComplete(llmResponseBuffer, this.language)) {
           this.eventEmitter.emit('llm-text', {
             text: llmResponseBuffer.trim(),
