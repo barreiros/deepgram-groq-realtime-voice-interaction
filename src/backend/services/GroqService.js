@@ -31,7 +31,7 @@ class GroqService {
 
     this.shutupModel = new ChatGroq({
       apiKey: apiKey,
-      model: 'llama3-8b-8192',
+      model: 'llama3-70b-8192',
       temperature: 0.1,
     })
 
@@ -65,36 +65,40 @@ class GroqService {
   }
 
   setupShutup() {
-    this.toolsPrompt = ChatPromptTemplate.fromMessages([
+    this.shutupPrompt = ChatPromptTemplate.fromMessages([
       [
         'system',
         `You are a tool decision assistant. Your only job is to determine if the user's input requires calling specific tools.
 
-Analyze the user's input and decide if you should call any of these tools:
-- stop_conversation: Use when the user explicitly asks to stop, interrupt, or pause the conversation
+Analyze the user's input and decide if you should call the stop_conversation tool.
 
-Look for interruption signals like:
-- "Stop", "pause", "interrupt"
+Call stop_conversation when the user explicitly asks to:
+- "Stop"
+- "Pause" 
 - "Wait"
 - "Hold on"
+- "Interrupt"
 - Direct requests to stop or pause
 
-If no tools are needed, simply respond with "no_tools_needed".`,
+If the user input does NOT contain clear interruption signals, respond with exactly: "no_tools_needed"
+
+Be very strict - only call the tool for explicit interruption requests.`,
       ],
       ['human', '{input}'],
       new MessagesPlaceholder('agent_scratchpad'),
     ])
 
-    this.toolsAgent = createToolCallingAgent({
+    this.shutupAgent = createToolCallingAgent({
       llm: this.shutupModel,
       tools: this.tools,
-      prompt: this.toolsPrompt,
+      prompt: this.shutupPrompt,
     })
 
-    this.toolsAgentExecutor = new AgentExecutor({
-      agent: this.toolsAgent,
+    this.shutupAgentExecutor = new AgentExecutor({
+      agent: this.shutupAgent,
       tools: this.tools,
       verbose: false,
+      maxIterations: 1,
     })
   }
 
@@ -173,7 +177,7 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       SentenceCompletion.isComplete(textToSend)
     )
     try {
-      const toolsResult = await this.toolsAgentExecutor.invoke({
+      const toolsResult = await this.shutupAgentExecutor.invoke({
         input: textToSend,
       })
 
