@@ -16,7 +16,7 @@ class GroqService {
     this.lastActivityTime = Date.now()
     this.silenceTimeout = null
     this.transcriptionBuffer = ''
-    this.model = new ChatGroq({
+    this.chatModel = new ChatGroq({
       apiKey: apiKey,
       model:
         this.params.groq_model ||
@@ -29,6 +29,12 @@ class GroqService {
       model: 'llama3-8b-8192',
     })
 
+    this.shutupModel = new ChatGroq({
+      apiKey: apiKey,
+      model: 'llama3-8b-8192',
+      temperature: 0.1,
+    })
+
     this.memory = new ConversationSummaryBufferMemory({
       llm: this.memoryModel,
       maxTokenLimit: 1000,
@@ -37,7 +43,8 @@ class GroqService {
 
     this.eventEmitter = eventEmitter
     this.tools = this.createTools()
-    this.setupAgent()
+    this.setupChat()
+    this.setupShutup()
   }
 
   createTools() {
@@ -54,21 +61,41 @@ class GroqService {
       },
     })
 
-    const changeTopicTool = new DynamicTool({
-      name: 'change_topic',
-      description:
-        'Use this when the user wants to change the conversation topic or interrupt to discuss something else. This tool helps identify the new topic and respond appropriately.',
-      func: async (input) => {
-        this.clearBuffers()
-        this.eventEmitter.emit('shutup', {
-          message: 'Topic change detected',
-        })
-        const topicAnalysis = await this.analyzeTopicChange(input)
-        return `Topic change detected: ${topicAnalysis}`
-      },
+    return [stopConversationTool]
+  }
+
+  setupShutup() {
+    this.toolsPrompt = ChatPromptTemplate.fromMessages([
+      [
+        'system',
+        `You are a tool decision assistant. Your only job is to determine if the user's input requires calling specific tools.
+
+Analyze the user's input and decide if you should call any of these tools:
+- stop_conversation: Use when the user explicitly asks to stop, interrupt, or pause the conversation
+
+Look for interruption signals like:
+- "Stop", "pause", "interrupt"
+- "Wait"
+- "Hold on"
+- Direct requests to stop or pause
+
+If no tools are needed, simply respond with "no_tools_needed".`,
+      ],
+      ['human', '{input}'],
+      new MessagesPlaceholder('agent_scratchpad'),
+    ])
+
+    this.toolsAgent = createToolCallingAgent({
+      llm: this.shutupModel,
+      tools: this.tools,
+      prompt: this.toolsPrompt,
     })
 
-    return [stopConversationTool, changeTopicTool]
+    this.toolsAgentExecutor = new AgentExecutor({
+      agent: this.toolsAgent,
+      tools: this.tools,
+      verbose: false,
+    })
   }
 
   clearBuffers() {
@@ -79,69 +106,22 @@ class GroqService {
     }
   }
 
-  async analyzeTopicChange(userInput) {
-    try {
-      const analysisPrompt = ChatPromptTemplate.fromTemplate(`
-        Analyze this user input to determine if they want to change topics or interrupt the conversation:
-
-        User input: "{input}"
-
-        If the user is clearly changing topics, identify the new topic they want to discuss.
-        If the topic change is unclear or vague, return "unclear_topic".
-
-        Respond with just the topic name or "unclear_topic".
-      `)
-
-      const analysisChain = analysisPrompt
-        .pipe(this.memoryModel)
-        .pipe(new StringOutputParser())
-
-      const result = await analysisChain.invoke({ input: userInput })
-      return result.trim()
-    } catch (error) {
-      console.error('Error analyzing topic change:', error)
-      return 'unclear_topic'
-    }
-  }
-
-  setupAgent() {
+  setupChat() {
     this.prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
         `You are a helpful english tutor. Please, make short responses.
 
-You have access to tools that can help you manage the conversation:
-- Use the stop_conversation tool when the user explicitly asks to stop, interrupt, or pause the conversation.
-- Use the change_topic tool when the user seems to be changing the subject or interrupting to discuss something else.
-
-When responding to topic changes:
-- If the new topic is clear, acknowledge it and engage with the new subject
-- If the topic change is unclear or vague, respond with something like "Yes, tell me more" or "What would you like to discuss?" to encourage them to clarify
-
-Pay attention to interruption signals like:
-- "Actually, let me ask about..."
-- "Wait, I want to talk about..."
-- "By the way..."
-- "Speaking of..."
-- Sudden subject changes
-- Questions that don't relate to the current topic`,
+Respond naturally to the user's input. Focus on being helpful and educational.`,
       ],
       new MessagesPlaceholder('chat_history'),
       ['human', '{input}'],
-      new MessagesPlaceholder('agent_scratchpad'),
     ])
 
-    this.agent = createToolCallingAgent({
-      llm: this.model,
-      tools: this.tools,
-      prompt: this.prompt,
-    })
-
-    this.agentExecutor = new AgentExecutor({
-      agent: this.agent,
-      tools: this.tools,
-      verbose: false,
-    })
+    const chain = this.prompt
+      .pipe(this.chatModel)
+      .pipe(new StringOutputParser())
+    this.conversationChain = chain
   }
 
   startSilenceTimeout() {
@@ -197,16 +177,23 @@ Pay attention to interruption signals like:
       SentenceCompletion.isComplete(textToSend)
     )
     try {
-      const chatHistory = await this.memory.loadMemoryVariables({})
-
       await this.sendToSilenceService(textToSend)
 
-      const result = await this.agentExecutor.invoke({
+      const toolsResult = await this.toolsAgentExecutor.invoke({
+        input: textToSend,
+      })
+
+      if (toolsResult.output !== 'no_tools_needed') {
+        console.log('Tools were called, skipping conversation response')
+        return
+      }
+
+      const chatHistory = await this.memory.loadMemoryVariables({})
+
+      const response = await this.conversationChain.invoke({
         input: textToSend,
         chat_history: chatHistory.history || [],
       })
-
-      const response = result.output
 
       if (response && response.trim().length > 0) {
         let llmResponseBuffer = response
