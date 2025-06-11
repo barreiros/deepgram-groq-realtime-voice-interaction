@@ -20,11 +20,11 @@ export default function App() {
 
   const testMessages = [
     'Hello, how are you?',
-    'I just want to chat with you',
-    'Tell the name of 20 cities in the world',
-    'Stop talking',
+    'I just want to chat with you.',
+    'Tell the name of 20 cities in the world.',
+    // 'Could you stop talking, please?',
     // 'Tell me a joke',
-    // 'Shut up',
+    'Shut up',
   ]
 
   const scrollToBottom = () => {
@@ -233,7 +233,7 @@ export default function App() {
             { type: 'system', text: 'Timer completed all messages' },
           ])
         }
-      }, 10000)
+      }, 7000)
 
       setIsTimerActive(true)
       setMessages((prev) => [

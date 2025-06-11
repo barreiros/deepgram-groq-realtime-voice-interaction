@@ -31,7 +31,7 @@ class GroqService {
 
     this.shutupModel = new ChatGroq({
       apiKey: apiKey,
-      model: 'qwen-qwq-32b',
+      model: 'llama3-8b-8192',
       temperature: 0.1,
     })
 
@@ -166,6 +166,14 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       const completeSentence = this.transcriptionBuffer
       this.transcriptionBuffer = ''
       await this.processBuffer(completeSentence)
+    } else {
+      console.log(
+        '*******************Sentence is not complete yet:',
+        this.transcriptionBuffer
+      )
+      await this.shutupAgentExecutor.invoke({
+        input: this.transcriptionBuffer,
+      })
     }
   }
 
@@ -176,21 +184,11 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       SentenceCompletion.isComplete(textToSend)
     )
     try {
-      const toolsResult = await this.shutupAgentExecutor.invoke({
-        input: textToSend,
-      })
-
-      if (toolsResult.output !== 'no_tools_needed') {
-        console.log('Shutup tool was called, skipping conversation response')
-        return
-      }
-
-      // const chatHistory = await this.memory.loadMemoryVariables({})
+      const chatHistory = await this.memory.loadMemoryVariables({})
 
       const response = await this.conversationChain.invoke({
         input: textToSend,
-        // chat_history: chatHistory.history || [],
-        chat_history: [],
+        chat_history: chatHistory.history || [],
       })
 
       if (response && response.trim().length > 0) {
