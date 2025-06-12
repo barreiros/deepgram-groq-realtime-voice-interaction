@@ -20,8 +20,9 @@ export default function App() {
 
   const testMessages = [
     'Hello, how are you?',
-    'I just want to chat with you.',
+    // 'I just want to chat with you.',
     'Tell the name of 20 cities in the world.',
+    'Let’s talk about dogs.',
     // 'Could you stop talking, please?',
     // 'Tell me a joke',
     'Shut up',
@@ -117,10 +118,12 @@ export default function App() {
         if (audioPlayback.current) {
           audioPlayback.current.stopPlayback()
         }
-        setMessages((prev) => [
-          ...prev,
-          { type: 'system', text: 'Continuing conversation...' },
-        ])
+        if (message.data) {
+          setMessages((prev) => [
+            ...prev,
+            { type: 'system', text: message.data },
+          ])
+        }
       }
     } catch (error) {
       console.error('Error handling WebSocket message:', error)

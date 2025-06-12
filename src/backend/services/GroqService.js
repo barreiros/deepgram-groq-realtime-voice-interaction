@@ -165,12 +165,9 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       console.log('Sentence is complete:', this.transcriptionBuffer)
       const completeSentence = this.transcriptionBuffer
       this.transcriptionBuffer = ''
+      this.eventEmitter.emit('shutup', {})
       await this.processBuffer(completeSentence)
     } else {
-      console.log(
-        '*******************Sentence is not complete yet:',
-        this.transcriptionBuffer
-      )
       await this.shutupAgentExecutor.invoke({
         input: this.transcriptionBuffer,
       })
