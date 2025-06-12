@@ -25,15 +25,16 @@ export class DeepgramService {
 
   initializeListenConnection() {
     this.listenConnection = this.dgClient.listen.live({
-      language: this.params.language || 'en',
+      language: this.params.listen_language || 'en',
+      model: this.params.listen_model || 'nova-3',
       punctuate: true,
       smart_format: true,
-      model: this.params.model || 'nova-3',
-      sample_rate: this.params?.sample_rate
-        ? parseInt(this.params.sample_rate)
+      sample_rate: this.params?.listen_sample_rate
+        ? parseInt(this.params.listen_sample_rate)
         : 16000,
-      channels: this.params?.channels ? parseInt(this.params.channels) : 1,
-      ...this.params,
+      channels: this.params?.listen_channels
+        ? parseInt(this.params.listen_channels)
+        : 1,
     })
 
     this.setupListenHandlers()
@@ -42,8 +43,8 @@ export class DeepgramService {
 
   initializeSpeakConnection() {
     this.speakConnection = this.dgClient.speak.live({
-      model: 'aura-2-thalia-en',
-      encoding: 'linear16',
+      model: this.params.speeh_model || 'aura-2-thalia-en',
+      encoding: this.params.speech_encodinng || 'linear16',
     })
 
     this.setupSpeakHandlers()

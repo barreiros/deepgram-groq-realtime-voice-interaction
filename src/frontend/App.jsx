@@ -57,8 +57,13 @@ export default function App() {
           onMessage: handleWebSocketMessage,
         },
         {
-          language: 'en',
-          model: 'nova-2-meeting',
+          // listen_language: 'en',
+          // listen_model: 'nova-2-meeting', // Only english
+          listen_model: 'nova-3',
+          listen_language: 'multi',
+          llm_model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+          llm_language: 'es',
+          speech_model: 'aura-2-thalia-en',
         }
       )
     }

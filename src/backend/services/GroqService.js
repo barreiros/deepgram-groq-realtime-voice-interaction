@@ -5,21 +5,25 @@ import {
 } from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import { ConversationSummaryBufferMemory } from 'langchain/memory'
+import { DynamicTool } from '@langchain/core/tools'
+import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
 import SentenceCompletion from '../tools/SentenceCompletion.js'
 
 class GroqService {
   constructor(apiKey, eventEmitter, params = {}) {
     this.params = params
-    this.language = params.langugage || 'en'
+    this.language = params.llm_langugage || 'en'
     this.lastActivityTime = Date.now()
     this.silenceTimeout = null
     this.transcriptionBuffer = ''
     this.chatModel = new ChatGroq({
       apiKey: apiKey,
       model:
-        this.params.groq_model ||
+        this.params.llm_model ||
         'meta-llama/llama-4-maverick-17b-128e-instruct',
-      temperature: this.params.temp ? parseFloat(this.params.temp) : 0.7,
+      temperature: this.params.llm_temp
+        ? parseFloat(this.params.llm_temp)
+        : 0.7,
     })
 
     this.memoryModel = new ChatGroq({
@@ -40,35 +44,63 @@ class GroqService {
     })
 
     this.eventEmitter = eventEmitter
+    this.tools = this.createTools()
     this.setupChat()
     this.setupShutup()
+  }
+
+  createTools() {
+    const stopConversationTool = new DynamicTool({
+      name: 'stop_conversation',
+      description:
+        'Stop the current conversation buffer and interrupt the model speech when the user wants to interrupt',
+      func: async () => {
+        this.eventEmitter.emit('shutup', {
+          message: 'Conversation stopped by user request',
+        })
+        return 'Conversation buffer stopped successfully'
+      },
+    })
+
+    return [stopConversationTool]
   }
 
   setupShutup() {
     this.shutupPrompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `You are a tool decision assistant. Analyze the user's input and determine if they want to interrupt or stop the conversation.
+        `You are a tool decision assistant. Your only job is to determine if the user's input requires calling specific tools.
 
-Look for interruption signals like:
+Analyze the user's input and decide if you should call the stop_conversation tool.
+
+Call stop_conversation when the user explicitly asks to:
 - "Stop"
-- "Pause" 
+- "Pause"
 - "Wait"
 - "Hold on"
 - "Interrupt"
+- Direct requests to stop or pause
 
-If you detect an interruption request, respond with exactly: "INTERRUPT"
-If no interruption is detected, respond with exactly: "CONTINUE"
+If the user input does NOT contain clear interruption signals, respond with exactly: "no_tools_needed"
 
-Only respond with one of these two words.`,
+Be very strict - only call the tool for explicit interruption requests.`,
       ],
       ['human', '{input}'],
+      new MessagesPlaceholder('agent_scratchpad'),
     ])
 
-    const chain = this.shutupPrompt
-      .pipe(this.shutupModel)
-      .pipe(new StringOutputParser())
-    this.shutupChain = chain
+    this.shutupAgent = createToolCallingAgent({
+      llm: this.shutupModel,
+      tools: this.tools,
+      prompt: this.shutupPrompt,
+    })
+
+    this.shutupAgentExecutor = new AgentExecutor({
+      agent: this.shutupAgent,
+      tools: this.tools,
+      verbose: false,
+      maxIterations: 1,
+    })
   }
 
   clearBuffers() {
@@ -138,19 +170,9 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       this.eventEmitter.emit('shutup', {})
       await this.processBuffer(completeSentence)
     } else {
-      try {
-        const shutupResponse = await this.shutupChain.invoke({
-          input: this.transcriptionBuffer,
-        })
-        
-        if (shutupResponse.trim() === 'INTERRUPT') {
-          this.eventEmitter.emit('shutup', {
-            message: 'Conversation interrupted by user request',
-          })
-        }
-      } catch (error) {
-        console.error('Error checking for interruption:', error)
-      }
+      await this.shutupAgentExecutor.invoke({
+        input: this.transcriptionBuffer,
+      })
     }
   }
 
