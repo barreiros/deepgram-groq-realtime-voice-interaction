@@ -5,8 +5,6 @@ import {
 } from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import { ConversationSummaryBufferMemory } from 'langchain/memory'
-import { DynamicTool } from '@langchain/core/tools'
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
 import SentenceCompletion from '../tools/SentenceCompletion.js'
 
 class GroqService {
@@ -42,63 +40,35 @@ class GroqService {
     })
 
     this.eventEmitter = eventEmitter
-    this.tools = this.createTools()
     this.setupChat()
     this.setupShutup()
-  }
-
-  createTools() {
-    const stopConversationTool = new DynamicTool({
-      name: 'stop_conversation',
-      description:
-        'Stop the current conversation buffer and interrupt the model speech when the user wants to interrupt',
-      func: async () => {
-        this.eventEmitter.emit('shutup', {
-          message: 'Conversation stopped by user request',
-        })
-        return 'Conversation buffer stopped successfully'
-      },
-    })
-
-    return [stopConversationTool]
   }
 
   setupShutup() {
     this.shutupPrompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `You are a tool decision assistant. Your only job is to determine if the user's input requires calling specific tools.
+        `You are a tool decision assistant. Analyze the user's input and determine if they want to interrupt or stop the conversation.
 
-Analyze the user's input and decide if you should call the stop_conversation tool.
-
-Call stop_conversation when the user explicitly asks to:
+Look for interruption signals like:
 - "Stop"
-- "Pause"
+- "Pause" 
 - "Wait"
 - "Hold on"
 - "Interrupt"
-- Direct requests to stop or pause
 
-If the user input does NOT contain clear interruption signals, respond with exactly: "no_tools_needed"
+If you detect an interruption request, respond with exactly: "INTERRUPT"
+If no interruption is detected, respond with exactly: "CONTINUE"
 
-Be very strict - only call the tool for explicit interruption requests.`,
+Only respond with one of these two words.`,
       ],
       ['human', '{input}'],
-      new MessagesPlaceholder('agent_scratchpad'),
     ])
 
-    this.shutupAgent = createToolCallingAgent({
-      llm: this.shutupModel,
-      tools: this.tools,
-      prompt: this.shutupPrompt,
-    })
-
-    this.shutupAgentExecutor = new AgentExecutor({
-      agent: this.shutupAgent,
-      tools: this.tools,
-      verbose: false,
-      maxIterations: 1,
-    })
+    const chain = this.shutupPrompt
+      .pipe(this.shutupModel)
+      .pipe(new StringOutputParser())
+    this.shutupChain = chain
   }
 
   clearBuffers() {
@@ -168,9 +138,19 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
       this.eventEmitter.emit('shutup', {})
       await this.processBuffer(completeSentence)
     } else {
-      await this.shutupAgentExecutor.invoke({
-        input: this.transcriptionBuffer,
-      })
+      try {
+        const shutupResponse = await this.shutupChain.invoke({
+          input: this.transcriptionBuffer,
+        })
+        
+        if (shutupResponse.trim() === 'INTERRUPT') {
+          this.eventEmitter.emit('shutup', {
+            message: 'Conversation interrupted by user request',
+          })
+        }
+      } catch (error) {
+        console.error('Error checking for interruption:', error)
+      }
     }
   }
 
