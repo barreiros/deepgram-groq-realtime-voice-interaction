@@ -9,6 +9,7 @@ import DeepgramService from './services/DeepgramService.js'
 import GroqService from './services/GroqService.js'
 import { EventEmitter } from 'events'
 import url from 'url'
+import fs from 'fs'
 
 dotenv.config()
 
@@ -109,6 +110,17 @@ wss.on('connection', (ws, req) => {
       try {
         parsedMessage = JSON.parse(message.toString())
       } catch (jsonError) {
+        // const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        // const filename = `audio_${timestamp}.raw`
+        // const filepath = path.join(__dirname, 'recordings', filename)
+
+        // if (!fs.existsSync(path.join(__dirname, 'recordings'))) {
+        //   fs.mkdirSync(path.join(__dirname, 'recordings'), { recursive: true })
+        // }
+
+        // fs.writeFileSync(filepath, message)
+        // console.log(`Raw audio saved to: ${filepath}`)
+
         sttService.sendMessage(message)
         return
       }

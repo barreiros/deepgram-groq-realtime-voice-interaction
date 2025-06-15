@@ -104,11 +104,12 @@ export class DeepgramService {
   }
 
   sendMessage(message) {
+    console.log('deepgram: sending message', message)
     try {
-      if (this.listenConnection.getReadyState() === 1) {
+      if (this.listenConnection?.getReadyState() === 1) {
         // console.log('socket: data sent to deepgram', message)
         this.listenConnection.send(message)
-      } else if (this.listenConnection.getReadyState() >= 2) {
+      } else if (this.listenConnection?.getReadyState() >= 2) {
         console.log("socket: data couldn't be sent to deepgram")
         console.log('socket: retrying connection to deepgram')
         this.listenConnection.removeAllListeners()
@@ -138,8 +139,8 @@ export class DeepgramService {
     }
   }
 
-  handleListenClose() {
-    console.log('deepgram: disconnected')
+  handleListenClose(event) {
+    console.log('deepgram: disconnected', event)
     this.close()
   }
 
