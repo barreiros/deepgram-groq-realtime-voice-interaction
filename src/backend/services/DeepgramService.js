@@ -35,6 +35,7 @@ export class DeepgramService {
       channels: this.params?.listen_channels
         ? parseInt(this.params.listen_channels)
         : 1,
+      encoding: this.params?.listen_encoding || null,
     })
 
     this.setupListenHandlers()
