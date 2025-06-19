@@ -1,6 +1,11 @@
 ---
 title: Deepgram Groq Realtime Voice Interaction
+emoji: 🗣️
+colorFrom: gray
+colorTo: blue
 sdk: docker
+app_file: Dockerfile
+pinned: false
 ---
 
 # Deepgram Groq Realtime Voice Interaction
