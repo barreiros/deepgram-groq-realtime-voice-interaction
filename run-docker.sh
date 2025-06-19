@@ -14,7 +14,7 @@ if [ $? -eq 0 ]; then
     echo "Build successful! Starting container..."
     
     # Run the container with environment variables from .env file
-    docker run -p 3001:3001 \
+    docker run -p 80:3001 -p 443:3001 \
         --env-file .env \
         --name barreiros-threeai-container \
         barreiros-threeai

@@ -9,7 +9,7 @@ docker build -t barreiros-threeai .
 
 if %errorlevel% equ 0 (
     echo Build successful! Starting container...
-    docker run -p 3001:3001 ^
+    docker run -p 80:3001 -p 443:3001 ^
         --env-file .env ^
         --name barreiros-threeai-container ^
         barreiros-threeai
