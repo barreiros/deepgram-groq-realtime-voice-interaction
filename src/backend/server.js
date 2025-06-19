@@ -15,6 +15,7 @@ dotenv.config()
 
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY
 const GROQ_API_KEY = process.env.GROQ_API_KEY
+const SECRET = process.env.SECRET
 
 if (!DEEPGRAM_API_KEY) {
   console.error('DEEPGRAM_API_KEY environment variable is not set!')
@@ -34,6 +35,13 @@ if (!GROQ_API_KEY) {
     'GROQ_API_KEY is set',
     GROQ_API_KEY.length > 10 ? '***' : GROQ_API_KEY
   )
+}
+
+if (!SECRET) {
+  console.error('SECRET environment variable is not set!')
+  process.exit(1)
+} else {
+  console.log('SECRET is set')
 }
 
 const __filename = fileURLToPath(import.meta.url)
@@ -58,8 +66,19 @@ app.get('/api/status', (req, res) => {
 wss.on('connection', (ws, req) => {
   console.log('Client connected to WebSocket')
 
-  const eventEmitter = new EventEmitter()
   const queryParams = url.parse(req.url, true).query
+  const providedSecret = queryParams.secret
+
+  if (!providedSecret || providedSecret !== SECRET) {
+    console.log('Unauthorized WebSocket connection attempt')
+    ws.send(JSON.stringify({ type: 'error', message: 'Unauthorized: Invalid secret' }))
+    ws.close(1008, 'Unauthorized')
+    return
+  }
+
+  console.log('WebSocket connection authorized')
+
+  const eventEmitter = new EventEmitter()
 
   console.log('Query parameters:', queryParams)
   const groqService = new GroqService(GROQ_API_KEY, eventEmitter, queryParams)

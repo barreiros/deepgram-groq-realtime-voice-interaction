@@ -1,6 +1,7 @@
 class BaseWebSocketService {
-  constructor(url, options = {}) {
+  constructor(url, callbacks = {}, options = {}) {
     this.url = url
+    this.callbacks = callbacks
     this.options = options
     this.ws = null
     this.onMessage = options.onMessage || (() => {})
@@ -13,8 +14,8 @@ class BaseWebSocketService {
 
   setupEventHandlers() {
     this.ws.onopen = () => {
-      console.log('WebSocket connection established')
-      if (this.options.onOpen) this.options.onOpen()
+      console.log('WebSocket connection established', this.options)
+      if (this.callback.onOpen) this.callbacks.onOpen()
     }
 
     this.ws.onmessage = (event) => {
@@ -28,12 +29,12 @@ class BaseWebSocketService {
 
     this.ws.onerror = (error) => {
       console.error('WebSocket error:', error)
-      if (this.options.onError) this.options.onError(error)
+      if (this.callbacks.onError) this.callbacks.onError(error)
     }
 
     this.ws.onclose = () => {
       console.log('WebSocket connection closed')
-      if (this.options.onClose) this.options.onClose()
+      if (this.callbacks.onClose) this.callbacks.onClose()
     }
   }
 

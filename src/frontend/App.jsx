@@ -3,12 +3,15 @@ import Scene from './components/Scene'
 import DeepgramWebSocketService from './services/deepgram/DeepgramWebSocketService'
 import { AudioRecordingService } from './audio/AudioRecordingService'
 import AudioPlaybackService from './audio/AudioPlaybackService'
+import SecretPrompt from './components/SecretPrompt'
 
 export default function App() {
   const [messages, setMessages] = useState([])
   const [isRecording, setIsRecording] = useState(false)
   const [isTimerActive, setIsTimerActive] = useState(false)
   const [audioStatus, setAudioStatus] = useState('')
+  const [showSecretPrompt, setShowSecretPrompt] = useState(true)
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const ws = useRef(null)
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
@@ -20,11 +23,7 @@ export default function App() {
 
   const testMessages = [
     'Hello, how are you?',
-    // 'I just want to chat with you.',
     'Tell the name of 20 cities in the world.',
-    'Let’s talk about dogs.',
-    // 'Could you stop talking, please?',
-    // 'Tell me a joke',
     'Shut up',
   ]
 
@@ -50,33 +49,81 @@ export default function App() {
     scrollToBottom()
   }, [messages])
 
-  useEffect(() => {
-    if (!ws.current) {
-      ws.current = new DeepgramWebSocketService(
-        {
-          onMessage: handleWebSocketMessage,
-        },
-        {
-          listen_language: 'en',
-          listen_model: 'nova-3',
-          // listen_model: 'nova-2-meeting', // Only english
-          // listen_model: 'nova-3',
-          // listen_language: 'multi',
-          llm_model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-          llm_language: 'es',
-          speech_model: 'aura-2-thalia-en',
-        }
-      )
+  const handleSecretSubmit = (secret) => {
+    initializeWebSocket(secret)
+  }
+
+  const initializeWebSocket = (secret) => {
+    if (ws.current) {
+      ws.current.close()
+      ws.current = null
     }
+
+    ws.current = new DeepgramWebSocketService(
+      {
+        onMessage: handleWebSocketMessage,
+        onOpen: () => {
+          console.log('WebSocket connected successfully')
+          setIsAuthorized(true)
+          setShowSecretPrompt(false)
+          setMessages((prev) => [
+            ...prev,
+            { type: 'system', text: 'Connected to server successfully' },
+          ])
+        },
+        onClose: () => {
+          console.log('WebSocket disconnected')
+          setIsAuthorized(false)
+          setShowSecretPrompt(true)
+          setMessages((prev) => [
+            ...prev,
+            { type: 'system', text: 'Disconnected from server' },
+          ])
+        },
+        onError: (error) => {
+          console.error('WebSocket error:', error)
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: 'error',
+              text: 'Connection failed: Invalid secret or server error',
+            },
+          ])
+          setShowSecretPrompt(true)
+          setIsAuthorized(false)
+          if (ws.current) {
+            ws.current.close()
+            ws.current = null
+          }
+        },
+      },
+      {
+        secret: secret,
+        listen_language: 'en',
+        listen_model: 'nova-3',
+        llm_model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+        llm_language: 'es',
+        speech_model: 'aura-2-thalia-en',
+      }
+    )
+
+    ws.current.connect()
+
     if (!audioPlayback.current) {
       audioPlayback.current = new AudioPlaybackService(sampleRate)
     }
+  }
+
+  useEffect(() => {
     return () => {
       if (audioService.current) {
         audioService.current.stopRecording()
       }
       if (timerRef.current) {
         clearInterval(timerRef.current)
+      }
+      if (ws.current) {
+        ws.current.close()
       }
     }
   }, [])
@@ -98,7 +145,6 @@ export default function App() {
           message.data.type === 'Buffer' &&
           Array.isArray(message.data.data)
         ) {
-          // console.log('Received audio blob from WebSocket', message.data)
           let uint8Array = new Uint8Array(message.data.data)
           if (uint8Array.length % 2 !== 0) {
             uint8Array = uint8Array.slice(0, uint8Array.length - 1)
@@ -130,6 +176,21 @@ export default function App() {
             { type: 'system', text: message.data },
           ])
         }
+      } else if (message.type === 'error') {
+        setMessages((prev) => [
+          ...prev,
+          { type: 'error', text: message.message || 'Unknown error' },
+        ])
+        if (message.message && message.message.includes('Unauthorized')) {
+          setShowSecretPrompt(true)
+          setIsAuthorized(false)
+          if (ws.current) {
+            ws.current.close()
+            ws.current = null
+          }
+        }
+      } else if (message.type === 'connection') {
+        console.log('Connection established:', message.message)
       }
     } catch (error) {
       console.error('Error handling WebSocket message:', error)
@@ -137,7 +198,7 @@ export default function App() {
   }
 
   const toggleRecording = async () => {
-    if (!ws.current) {
+    if (!ws.current || !isAuthorized) {
       setMessages((prev) => [
         ...prev,
         { type: 'error', text: 'Cannot record audio: Not connected to server' },
@@ -189,7 +250,7 @@ export default function App() {
   }
 
   const toggleTimer = () => {
-    if (!ws.current) {
+    if (!ws.current || !isAuthorized) {
       setMessages((prev) => [
         ...prev,
         { type: 'error', text: 'Cannot start timer: Not connected to server' },
@@ -249,10 +310,14 @@ export default function App() {
         ...prev,
         {
           type: 'system',
-          text: 'Timer started - sending messages every 5 seconds',
+          text: 'Timer started - sending messages every 7 seconds',
         },
       ])
     }
+  }
+
+  if (showSecretPrompt) {
+    return <SecretPrompt onSecretSubmit={handleSecretSubmit} />
   }
 
   return (
@@ -295,9 +360,12 @@ export default function App() {
             className={`w-full flex items-center justify-center gap-2 py-2.5 px-2.5 border-none rounded text-white cursor-pointer transition-colors ${
               isRecording
                 ? 'bg-red-600 animate-[pulse_1.5s_infinite]'
-                : 'bg-zinc-700 hover:bg-zinc-600'
+                : isAuthorized
+                ? 'bg-zinc-700 hover:bg-zinc-600'
+                : 'bg-gray-500 cursor-not-allowed'
             }`}
             onClick={toggleRecording}
+            disabled={!isAuthorized}
           >
             <span
               className={`w-3 h-3 rounded-full bg-white ${
@@ -310,9 +378,12 @@ export default function App() {
             className={`w-full flex items-center justify-center gap-2 py-2.5 px-2.5 border-none rounded text-white cursor-pointer transition-colors ${
               isTimerActive
                 ? 'bg-orange-600 animate-[pulse_1.5s_infinite]'
-                : 'bg-zinc-700 hover:bg-zinc-600'
+                : isAuthorized
+                ? 'bg-zinc-700 hover:bg-zinc-600'
+                : 'bg-gray-500 cursor-not-allowed'
             }`}
             onClick={toggleTimer}
+            disabled={!isAuthorized}
           >
             <span
               className={`w-3 h-3 rounded-full bg-white ${

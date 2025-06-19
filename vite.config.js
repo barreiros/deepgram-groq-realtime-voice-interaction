@@ -7,6 +7,9 @@ export default defineConfig({
   css: {
     postcss: './postcss.config.js',
   },
+  define: {
+    'import.meta.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL || 'ws://localhost:7860')
+  },
   server: {
     port: 3000,
     open: true,

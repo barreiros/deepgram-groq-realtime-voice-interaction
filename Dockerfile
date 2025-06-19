@@ -8,6 +8,9 @@ RUN npm i --only=production
 
 COPY . .
 
+ARG VITE_WS_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
 RUN npm run build
 
 EXPOSE 7860
