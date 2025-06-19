@@ -21,7 +21,7 @@ class BaseWebSocketService {
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        this.onMessage(data)
+        if (this.callbacks.onMessage) this.callbacks.onMessage(data)
       } catch (error) {
         console.error('Error handling WebSocket message:', error)
       }
