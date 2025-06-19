@@ -1,9 +1,6 @@
 ---
-title: { { title } }
-emoji: { { emoji } }
-colorFrom: { { colorFrom } }
-colorTo: { { colorTo } }
-sdk: { { sdk } }
+title: Deepgram Groq Realtime Voice Interaction
+sdk: docker
 ---
 
 # Deepgram Groq Realtime Voice Interaction
