@@ -24,7 +24,7 @@ export class DeepgramService {
   }
 
   initializeListenConnection() {
-    this.listenConnection = this.dgClient.listen.live({
+    const listenConfig = {
       language: this.params.listen_language || 'en',
       model: this.params.listen_model || 'nova-3',
       punctuate: true,
@@ -35,8 +35,13 @@ export class DeepgramService {
       channels: this.params?.listen_channels
         ? parseInt(this.params.listen_channels)
         : 1,
-      encoding: this.params?.listen_encoding || null,
-    })
+    }
+
+    if (this.params?.listen_encoding && this.params.listen_encoding !== null) {
+      listenConfig.encoding = this.params.listen_encoding
+    }
+
+    this.listenConnection = this.dgClient.listen.live(listenConfig)
 
     this.setupListenHandlers()
     this.startKeepAlive()

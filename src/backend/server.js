@@ -19,23 +19,38 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY
 if (!DEEPGRAM_API_KEY) {
   console.error('DEEPGRAM_API_KEY environment variable is not set!')
   process.exit(1)
+} else {
+  console.log(
+    'DEEPGRAM_API_KEY is set',
+    DEEPGRAM_API_KEY.length > 10 ? '***' : DEEPGRAM_API_KEY
+  )
 }
 
 if (!GROQ_API_KEY) {
   console.error('GROQ_API_KEY environment variable is not set!')
   process.exit(1)
+} else {
+  console.log(
+    'GROQ_API_KEY is set',
+    GROQ_API_KEY.length > 10 ? '***' : GROQ_API_KEY
+  )
 }
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const app = express()
-const port = 3001
+const port = process.env.PORT || 3001
 
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server })
 
-app.use(express.static(path.join(__dirname, '../../public')))
+app.use(express.static(path.join(__dirname, '../../dist')))
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../dist/index.html'))
+})
+
 app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running' })
 })
@@ -152,7 +167,7 @@ wss.on('connection', (ws, req) => {
   })
 })
 
-server.listen(port, () => {
+server.listen(port, '0.0.0.0', () => {
   console.log(`Backend server running at http://localhost:${port}`)
   console.log(`WebSocket server running at ws://localhost:${port}`)
 })
