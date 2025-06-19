@@ -1,3 +1,11 @@
+---
+title: { { title } }
+emoji: { { emoji } }
+colorFrom: { { colorFrom } }
+colorTo: { { colorTo } }
+sdk: { { sdk } }
+---
+
 # Deepgram Groq Realtime Voice Interaction
 
 Deepgram Groq Realtime Voice Interaction is a full-stack web application that integrates Three.js for 3D rendering with real-time WebSocket communication and AI services. It features audio-to-text communication through Deepgram's speech-to-text API, with an architecture designed to support multiple AI service providers. This project aims to provide a cost-effective alternative to OpenAI and Google Gemini's real-time voice interaction APIs.
