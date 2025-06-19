@@ -2,7 +2,7 @@ import BaseWebSocketService from '../websocket/BaseWebSocketService'
 
 class DeepgramWebSocketService extends BaseWebSocketService {
   constructor(callbacks = {}, options = {}) {
-    const wsUrl = new URL(import.meta.env.VITE_WS_URL || 'ws://localhost:7860')
+    const wsUrl = new URL(import.meta.env.VITE_WS_URL)
 
     Object.entries(options).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {

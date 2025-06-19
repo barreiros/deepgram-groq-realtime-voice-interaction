@@ -6,6 +6,7 @@ import AudioPlaybackService from './audio/AudioPlaybackService'
 import SecretPrompt from './components/SecretPrompt'
 
 export default function App() {
+  console.log('env variables', import.meta.env)
   const [messages, setMessages] = useState([])
   const [isRecording, setIsRecording] = useState(false)
   const [isTimerActive, setIsTimerActive] = useState(false)

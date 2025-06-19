@@ -1,31 +1,32 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
-  plugins: [react()],
-  root: 'src/frontend',
-  css: {
-    postcss: './postcss.config.js',
-  },
-  define: {
-    'import.meta.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL || 'ws://localhost:7860')
-  },
-  server: {
-    port: 3000,
-    open: true,
-    cors: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        secure: false,
+export default defineConfig(({ mode }) => {
+  process.env = { ...process.env, ...loadEnv(mode, process.cwd()) }
+
+  return {
+    plugins: [react()],
+    root: 'src/frontend',
+    css: {
+      postcss: './postcss.config.js',
+    },
+    server: {
+      port: 3000,
+      open: true,
+      cors: true,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
-  },
-  build: {
-    outDir: '../../dist',
-    assetsDir: 'assets',
-    sourcemap: true,
-    emptyOutDir: true,
-  },
+    build: {
+      outDir: '../../dist',
+      assetsDir: 'assets',
+      sourcemap: true,
+      emptyOutDir: true,
+    },
+  }
 })
