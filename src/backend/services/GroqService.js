@@ -231,8 +231,10 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
       const userQuery = text || 'What can you tell me about this image?'
 
       await this.memory.saveContext(
-        { input: `${userQuery} [Image description: ${imageDescription}]` },
-        { output: '' }
+        {
+          input: `User shared an image (${imageData.name}) and asked: "${userQuery}"`,
+        },
+        { output: `I can see in the image: ${imageDescription}` }
       )
     } catch (error) {
       console.error('Error processing image message:', error)
