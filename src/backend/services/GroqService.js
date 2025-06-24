@@ -19,6 +19,8 @@ class GroqService {
     this.eventEmitter = eventEmitter
     this.currentAgentInstructions =
       'You are a helpful AI assistant. Respond naturally and be concise but informative.'
+    this.defaultInstructions =
+      'Be precise and concise in your answers and avoid long responses because you are interacting with the user using the voice and the conversation should be fluent. When users share images with you, you can see and analyze them directly. Answer questions about images based on what you can observe in them. Never mention that you cannot see images or that you only have descriptions - you can see the images directly.'
 
     this.chatModel = new ChatGroq({
       apiKey: apiKey,
@@ -58,8 +60,13 @@ class GroqService {
   updateAgentInstructions(instructions) {
     this.currentAgentInstructions =
       instructions ||
-      'You are a helpful AI assistant. Respond naturally and be concise but informative.'
+      'You are a helpful AI assistant. Be precise and concise in your answers and avoid long responses because you are interacting with the user using the voice and the conversation should be fluent. Most of the cases is better to respond with yes or not than an unusseful long answer. When users share images with you, you can see and analyze them directly. Answer questions about images based on what you can observe in them.'
     console.log('Agent instructions updated to:', this.currentAgentInstructions)
+  }
+
+  getEffectiveSystemMessage(customInstructions = null) {
+    const baseInstructions = customInstructions || this.currentAgentInstructions
+    return `${baseInstructions}\n\n${this.defaultInstructions}`
   }
 
   setupShutup() {
@@ -167,7 +174,7 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
     try {
       const { text, image, agentInstructions } = messageData
 
-      const systemMessage = agentInstructions || this.currentAgentInstructions
+      const systemMessage = this.getEffectiveSystemMessage(agentInstructions)
 
       if (image) {
         await this.processImageMessage(text, image, systemMessage)
@@ -232,9 +239,11 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
 
       await this.memory.saveContext(
         {
-          input: `User shared an image (${imageData.name}) and asked: "${userQuery}"`,
+          input: `${userQuery} [Image content: ${imageDescription}]`,
         },
-        { output: `I can see in the image: ${imageDescription}` }
+        {
+          output: `I can see the image. ${imageDescription}`,
+        }
       )
     } catch (error) {
       console.error('Error processing image message:', error)
@@ -277,7 +286,7 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
     try {
       const chatHistory = await this.memory.loadMemoryVariables({})
       const effectiveSystemMessage =
-        systemMessage || this.currentAgentInstructions
+        this.getEffectiveSystemMessage(systemMessage)
 
       const response = await this.conversationChain.invoke({
         input: textToSend,
