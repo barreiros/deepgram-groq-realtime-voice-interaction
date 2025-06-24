@@ -3,10 +3,10 @@ import DeepgramWebSocketService from './services/deepgram/DeepgramWebSocketServi
 import { AudioRecordingService } from './audio/AudioRecordingService'
 import AudioPlaybackService from './audio/AudioPlaybackService'
 import SecretPrompt from './components/SecretPrompt'
+import Chat from './components/Chat'
 
 export default function App() {
   const [messages, setMessages] = useState([])
-  const [inputText, setInputText] = useState('')
   const [agentInstructions, setAgentInstructions] = useState('')
   const [currentAgentInstructions, setCurrentAgentInstructions] = useState('')
   const [showSecretPrompt, setShowSecretPrompt] = useState(true)
@@ -19,23 +19,7 @@ export default function App() {
   const ws = useRef(null)
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
-  const messagesContainerRef = useRef(null)
-  const fileInputRef = useRef(null)
-  const chatInputRef = useRef(null)
   const sampleRate = 24000
-
-  const scrollToBottom = () => {
-    if (messagesContainerRef.current) {
-      setTimeout(() => {
-        messagesContainerRef.current.scrollTop =
-          messagesContainerRef.current.scrollHeight
-      }, 100)
-    }
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
 
   useEffect(() => {
     const handlePaste = (e) => {
@@ -290,14 +274,6 @@ export default function App() {
     })
   }
 
-  const handleImageSelect = (event) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      console.log('Selected files from input:', files.length)
-      handleImageFiles(Array.from(files))
-    }
-  }
-
   const removeImage = (index) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index))
     setImagePreviews((prev) => prev.filter((_, i) => i !== index))
@@ -306,8 +282,64 @@ export default function App() {
   const removeAllImages = () => {
     setSelectedImages([])
     setImagePreviews([])
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+  }
+
+  const handleSendMessage = async (text, images, previews) => {
+    console.log('About to send message with images:', images.length)
+    console.log('Selected images array:', images)
+
+    const messageData = {
+      type: 'chat-message',
+      text: text,
+      agentInstructions: currentAgentInstructions,
+      timestamp: Date.now(),
+    }
+
+    if (images.length > 0) {
+      console.log('Processing images for sending...')
+      const imagePromises = images.map((file, index) => {
+        console.log(`Processing image ${index + 1}:`, file.name)
+        return new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const base64Data = reader.result.split(',')[1]
+            console.log(`Image ${index + 1} converted to base64, size:`, base64Data.length)
+            resolve({
+              data: base64Data,
+              type: file.type,
+              name: file.name,
+            })
+          }
+          reader.readAsDataURL(file)
+        })
+      })
+
+      const imageDataArray = await Promise.all(imagePromises)
+      console.log('All images processed, final array length:', imageDataArray.length)
+      messageData.images = imageDataArray
+
+      console.log('Sending message with images:', messageData.images.length)
+      ws.current.sendMessage(messageData)
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: 'user',
+          text: text,
+          images: previews,
+          timestamp: Date.now(),
+        },
+      ])
+
+      removeAllImages()
+    } else {
+      console.log('Sending text-only message')
+      ws.current.sendMessage(messageData)
+
+      setMessages((prev) => [
+        ...prev,
+        { type: 'user', text: text, timestamp: Date.now() },
+      ])
     }
   }
 
@@ -388,82 +420,6 @@ export default function App() {
     }
   }
 
-  const sendTextMessage = async () => {
-    if (
-      (!inputText.trim() && selectedImages.length === 0) ||
-      !ws.current ||
-      !isAuthorized
-    )
-      return
-
-    console.log('About to send message with images:', selectedImages.length)
-    console.log('Selected images array:', selectedImages)
-
-    const messageData = {
-      type: 'chat-message',
-      text: inputText.trim(),
-      agentInstructions: currentAgentInstructions,
-      timestamp: Date.now(),
-    }
-
-    if (selectedImages.length > 0) {
-      console.log('Processing images for sending...')
-      const imagePromises = selectedImages.map((file, index) => {
-        console.log(`Processing image ${index + 1}:`, file.name)
-        return new Promise((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            const base64Data = reader.result.split(',')[1]
-            console.log(`Image ${index + 1} converted to base64, size:`, base64Data.length)
-            resolve({
-              data: base64Data,
-              type: file.type,
-              name: file.name,
-            })
-          }
-          reader.readAsDataURL(file)
-        })
-      })
-
-      const imageDataArray = await Promise.all(imagePromises)
-      console.log('All images processed, final array length:', imageDataArray.length)
-      messageData.images = imageDataArray
-
-      console.log('Sending message with images:', messageData.images.length)
-      ws.current.sendMessage(messageData)
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          type: 'user',
-          text: inputText.trim(),
-          images: imagePreviews,
-          timestamp: Date.now(),
-        },
-      ])
-
-      setInputText('')
-      removeAllImages()
-    } else {
-      console.log('Sending text-only message')
-      ws.current.sendMessage(messageData)
-
-      setMessages((prev) => [
-        ...prev,
-        { type: 'user', text: inputText.trim(), timestamp: Date.now() },
-      ])
-
-      setInputText('')
-    }
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendTextMessage()
-    }
-  }
-
   const clearChat = () => {
     setMessages([])
   }
@@ -533,54 +489,18 @@ export default function App() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
-        <div className="max-w-4xl mx-auto h-full flex flex-col">
-          <div
-            ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-4"
-          >
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${
-                  message.type === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-lg p-4 ${
-                    message.type === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : message.type === 'assistant'
-                      ? 'bg-white text-gray-800 shadow-sm border'
-                      : message.type === 'system'
-                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                      : 'bg-red-100 text-red-800 border border-red-200'
-                  }`}
-                >
-                  {message.images && message.images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      {message.images.map((image, imgIndex) => (
-                        <img
-                          key={imgIndex}
-                          src={image}
-                          alt={`Uploaded ${imgIndex + 1}`}
-                          className="max-w-full h-auto rounded-lg"
-                        />
-                      ))}
-                    </div>
-                  )}
-                  <div className="whitespace-pre-wrap break-words">
-                    {message.text}
-                  </div>
-                  <div className="text-xs opacity-70 mt-2">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <Chat
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        onClearChat={clearChat}
+        onImageFilesSelected={handleImageFiles}
+        onRemoveImage={removeImage}
+        onRemoveAllImages={removeAllImages}
+        selectedImages={selectedImages}
+        imagePreviews={imagePreviews}
+        isAuthorized={isAuthorized}
+        isDragOver={isDragOver}
+      />
 
       <div className="bg-white border-t p-4">
         <div className="max-w-4xl mx-auto">
@@ -602,83 +522,6 @@ export default function App() {
             >
               🎤
             </button>
-          </div>
-
-          {imagePreviews.length > 0 && (
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">
-                  {imagePreviews.length} image
-                  {imagePreviews.length > 1 ? 's' : ''} selected
-                </span>
-                <button
-                  onClick={removeAllImages}
-                  className="text-sm text-red-500 hover:text-red-700"
-                >
-                  Remove all
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {imagePreviews.map((preview, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-20 object-cover rounded-lg border"
-                    />
-                    <button
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex space-x-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageSelect}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-              disabled={!isAuthorized}
-            >
-              📎
-            </button>
-            <textarea
-              ref={chatInputRef}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message, paste/drag images, or use voice..."
-              className="flex-1 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows="1"
-              disabled={!isAuthorized}
-            />
-            <button
-              onClick={sendTextMessage}
-              disabled={
-                (!inputText.trim() && selectedImages.length === 0) ||
-                !isAuthorized
-              }
-              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            >
-              Send
-            </button>
-          </div>
-
-          <div className="text-xs text-gray-500 text-center mt-2">
-            💡 Tip: You can paste (Ctrl+V) or drag & drop multiple images
-            directly into the chat
           </div>
         </div>
       </div>
