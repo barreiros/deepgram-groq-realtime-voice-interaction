@@ -520,7 +520,7 @@ export default function App() {
             <button
               onClick={updateAgentInstructions}
               disabled={!isAuthorized}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowe transition-colors whitespace-nowrap"
             >
               Update Agent
             </button>
@@ -568,13 +568,6 @@ export default function App() {
                         />
                       ))}
                     </div>
-                  )}
-                  {message.image && (
-                    <img
-                      src={message.image}
-                      alt="Uploaded"
-                      className="max-w-full h-auto rounded-lg mb-2"
-                    />
                   )}
                   <div className="whitespace-pre-wrap break-words">
                     {message.text}

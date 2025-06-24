@@ -173,16 +173,13 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
   async processChatMessage(messageData) {
     try {
       console.log('Processing chat message:', messageData)
-      const { text, image, images, agentInstructions } = messageData
+      const { text, images, agentInstructions } = messageData
 
       const systemMessage = this.getEffectiveSystemMessage(agentInstructions)
 
       if (images && Array.isArray(images) && images.length > 0) {
         console.log(`Processing ${images.length} images`)
-        await this.processMultipleImagesMessage(text, images, systemMessage)
-      } else if (image) {
-        console.log('Processing single image')
-        await this.processImageMessage(text, image, systemMessage)
+        await this.processImagesMessage(text, images, systemMessage)
       } else {
         console.log('Processing text message')
         await this.processTextMessage(text, systemMessage)
@@ -246,7 +243,7 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
     }
   }
 
-  async processMultipleImagesMessage(text, imagesData, systemMessage) {
+  async processImagesMessage(text, imagesData, systemMessage) {
     try {
       console.log(`Starting to process ${imagesData.length} images`)
 
@@ -273,41 +270,26 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
           return `Image ${result.index}: ${result.description}`
         })
 
-      const userQuery = text || 'What can you tell me about these images?'
+      const userQuery =
+        text ||
+        (imagesData.length === 1
+          ? 'What can you tell me about this image?'
+          : 'What can you tell me about these images?')
       const combinedDescriptions = imageDescriptions.join('\n\n')
 
       console.log(`Saving context for ${imageDescriptions.length} images`)
       await this.memory.saveContext(
         {
-          input: `${userQuery} [Multiple images content: ${combinedDescriptions}]`,
+          input: `${userQuery} [Images content: ${combinedDescriptions}]`,
         },
         {
-          output: `I can see the ${imagesData.length} images you shared. ${combinedDescriptions}`,
+          output: `I can see the ${imagesData.length} ${
+            imagesData.length === 1 ? 'image' : 'images'
+          } you shared. ${combinedDescriptions}`,
         }
       )
     } catch (error) {
-      console.error('Error processing multiple images message:', error)
-      this.eventEmitter.emit('error', { error: error.message })
-    }
-  }
-
-  async processImageMessage(text, imageData, systemMessage) {
-    try {
-      const imageDescription = await this.generateImageDescription(imageData)
-      console.log('Image description generated:', imageDescription)
-
-      const userQuery = text || 'What can you tell me about this image?'
-
-      await this.memory.saveContext(
-        {
-          input: `${userQuery} [Image content: ${imageDescription}]`,
-        },
-        {
-          output: `I can see the image. ${imageDescription}`,
-        }
-      )
-    } catch (error) {
-      console.error('Error processing image message:', error)
+      console.error('Error processing images message:', error)
       this.eventEmitter.emit('error', { error: error.message })
     }
   }
