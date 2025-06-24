@@ -172,13 +172,19 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
 
   async processChatMessage(messageData) {
     try {
-      const { text, image, agentInstructions } = messageData
+      console.log('Processing chat message:', messageData)
+      const { text, image, images, agentInstructions } = messageData
 
       const systemMessage = this.getEffectiveSystemMessage(agentInstructions)
 
-      if (image) {
+      if (images && Array.isArray(images) && images.length > 0) {
+        console.log(`Processing ${images.length} images`)
+        await this.processMultipleImagesMessage(text, images, systemMessage)
+      } else if (image) {
+        console.log('Processing single image')
         await this.processImageMessage(text, image, systemMessage)
       } else {
+        console.log('Processing text message')
         await this.processTextMessage(text, systemMessage)
       }
     } catch (error) {
@@ -187,7 +193,7 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
     }
   }
 
-  async processImageMessage(text, imageData, systemMessage) {
+  async generateImageDescription(imageData) {
     try {
       const imageUrl = `data:${imageData.type};base64,${imageData.data}`
 
@@ -223,7 +229,6 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
         }
       )
 
-      let imageDescription = ''
       if (
         descriptionResponse &&
         descriptionResponse.choices &&
@@ -231,9 +236,65 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
         descriptionResponse.choices[0].message &&
         descriptionResponse.choices[0].message.content
       ) {
-        imageDescription = descriptionResponse.choices[0].message.content.trim()
-        console.log('Image description generated:', imageDescription)
+        return descriptionResponse.choices[0].message.content.trim()
       }
+
+      return ''
+    } catch (error) {
+      console.error('Error generating image description:', error)
+      return ''
+    }
+  }
+
+  async processMultipleImagesMessage(text, imagesData, systemMessage) {
+    try {
+      console.log(`Starting to process ${imagesData.length} images`)
+
+      const imageDescriptionPromises = imagesData.map((imageData, index) => {
+        console.log(`Creating promise for image ${index + 1}`)
+        return this.generateImageDescription(imageData).then((description) => ({
+          index: index + 1,
+          description,
+          name: imageData.name || `image_${index + 1}`,
+        }))
+      })
+
+      console.log('Waiting for all image descriptions...')
+      const imageResults = await Promise.all(imageDescriptionPromises)
+      console.log('All image descriptions completed:', imageResults.length)
+
+      const imageDescriptions = imageResults
+        .filter((result) => result.description)
+        .map((result) => {
+          console.log(
+            `Image ${result.index} description generated:`,
+            result.description.substring(0, 100) + '...'
+          )
+          return `Image ${result.index}: ${result.description}`
+        })
+
+      const userQuery = text || 'What can you tell me about these images?'
+      const combinedDescriptions = imageDescriptions.join('\n\n')
+
+      console.log(`Saving context for ${imageDescriptions.length} images`)
+      await this.memory.saveContext(
+        {
+          input: `${userQuery} [Multiple images content: ${combinedDescriptions}]`,
+        },
+        {
+          output: `I can see the ${imagesData.length} images you shared. ${combinedDescriptions}`,
+        }
+      )
+    } catch (error) {
+      console.error('Error processing multiple images message:', error)
+      this.eventEmitter.emit('error', { error: error.message })
+    }
+  }
+
+  async processImageMessage(text, imageData, systemMessage) {
+    try {
+      const imageDescription = await this.generateImageDescription(imageData)
+      console.log('Image description generated:', imageDescription)
 
       const userQuery = text || 'What can you tell me about this image?'
 

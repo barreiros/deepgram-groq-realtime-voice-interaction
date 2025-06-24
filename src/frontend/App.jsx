@@ -13,8 +13,8 @@ export default function App() {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [audioStatus, setAudioStatus] = useState('')
-  const [selectedImage, setSelectedImage] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
+  const [selectedImages, setSelectedImages] = useState([])
+  const [imagePreviews, setImagePreviews] = useState([])
   const [isDragOver, setIsDragOver] = useState(false)
   const ws = useRef(null)
   const audioService = useRef(null)
@@ -27,7 +27,8 @@ export default function App() {
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
       setTimeout(() => {
-        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+        messagesContainerRef.current.scrollTop =
+          messagesContainerRef.current.scrollHeight
       }, 100)
     }
   }
@@ -41,16 +42,20 @@ export default function App() {
       const items = e.clipboardData?.items
       if (!items) return
 
+      const imageFiles = []
       for (let i = 0; i < items.length; i++) {
         const item = items[i]
         if (item.type.startsWith('image/')) {
-          e.preventDefault()
           const file = item.getAsFile()
           if (file) {
-            handleImageFile(file)
+            imageFiles.push(file)
           }
-          break
         }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault()
+        handleImageFiles(imageFiles)
       }
     }
 
@@ -69,12 +74,14 @@ export default function App() {
     const handleDrop = (e) => {
       e.preventDefault()
       setIsDragOver(false)
-      
+
       const files = e.dataTransfer?.files
       if (files && files.length > 0) {
-        const file = files[0]
-        if (file.type.startsWith('image/')) {
-          handleImageFile(file)
+        const imageFiles = Array.from(files).filter((file) =>
+          file.type.startsWith('image/')
+        )
+        if (imageFiles.length > 0) {
+          handleImageFiles(imageFiles)
         }
       }
     }
@@ -110,23 +117,35 @@ export default function App() {
           setIsAuthorized(true)
           setShowSecretPrompt(false)
           setMessages([
-            { type: 'system', text: 'Connected to AI Agent successfully', timestamp: Date.now() }
+            {
+              type: 'system',
+              text: 'Connected to AI Agent successfully',
+              timestamp: Date.now(),
+            },
           ])
         },
         onClose: () => {
           console.log('WebSocket disconnected')
           setIsAuthorized(false)
           setShowSecretPrompt(true)
-          setMessages(prev => [
+          setMessages((prev) => [
             ...prev,
-            { type: 'system', text: 'Disconnected from server', timestamp: Date.now() }
+            {
+              type: 'system',
+              text: 'Disconnected from server',
+              timestamp: Date.now(),
+            },
           ])
         },
         onError: (error) => {
           console.error('WebSocket error:', error)
-          setMessages(prev => [
+          setMessages((prev) => [
             ...prev,
-            { type: 'error', text: 'Connection failed: Invalid secret or server error', timestamp: Date.now() }
+            {
+              type: 'error',
+              text: 'Connection failed: Invalid secret or server error',
+              timestamp: Date.now(),
+            },
           ])
           setShowSecretPrompt(true)
           setIsAuthorized(false)
@@ -189,14 +208,14 @@ export default function App() {
           audioPlayback.current.playPcmAudio(int16Array)
         }
       } else if (message.type === 'llm-text') {
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
-          { type: 'assistant', text: message.data, timestamp: Date.now() }
+          { type: 'assistant', text: message.data, timestamp: Date.now() },
         ])
       } else if (message.type === 'transcription') {
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
-          { type: 'user', text: message.data, timestamp: Date.now() }
+          { type: 'user', text: message.data, timestamp: Date.now() },
         ])
       } else if (message.type === 'shutup') {
         console.log('Shutup event received:', message.data)
@@ -204,20 +223,28 @@ export default function App() {
           audioPlayback.current.stopPlayback()
         }
         if (message.data) {
-          setMessages(prev => [
+          setMessages((prev) => [
             ...prev,
-            { type: 'system', text: message.data, timestamp: Date.now() }
+            { type: 'system', text: message.data, timestamp: Date.now() },
           ])
         }
       } else if (message.type === 'agent-instructions-updated') {
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
-          { type: 'system', text: 'Agent instructions updated successfully', timestamp: Date.now() }
+          {
+            type: 'system',
+            text: 'Agent instructions updated successfully',
+            timestamp: Date.now(),
+          },
         ])
       } else if (message.type === 'error') {
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
-          { type: 'error', text: message.message || 'Unknown error', timestamp: Date.now() }
+          {
+            type: 'error',
+            text: message.message || 'Unknown error',
+            timestamp: Date.now(),
+          },
         ])
         if (message.message && message.message.includes('Unauthorized')) {
           setShowSecretPrompt(true)
@@ -235,25 +262,50 @@ export default function App() {
     }
   }
 
-  const handleImageFile = (file) => {
-    if (file && file.type.startsWith('image/')) {
-      setSelectedImage(file)
+  const handleImageFiles = (files) => {
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
+    )
+    if (imageFiles.length === 0) return
+
+    console.log('Adding images:', imageFiles.length)
+    console.log('Current selectedImages:', selectedImages.length)
+
+    setSelectedImages(prev => {
+      const newImages = [...prev, ...imageFiles]
+      console.log('New selectedImages array:', newImages.length)
+      return newImages
+    })
+
+    imageFiles.forEach((file) => {
       const reader = new FileReader()
       reader.onload = (e) => {
-        setImagePreview(e.target.result)
+        setImagePreviews((prev) => {
+          const newPreviews = [...prev, e.target.result]
+          console.log('New imagePreviews array:', newPreviews.length)
+          return newPreviews
+        })
       }
       reader.readAsDataURL(file)
-    }
+    })
   }
 
   const handleImageSelect = (event) => {
-    const file = event.target.files[0]
-    handleImageFile(file)
+    const files = event.target.files
+    if (files && files.length > 0) {
+      console.log('Selected files from input:', files.length)
+      handleImageFiles(Array.from(files))
+    }
   }
 
-  const removeImage = () => {
-    setSelectedImage(null)
-    setImagePreview(null)
+  const removeImage = (index) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeAllImages = () => {
+    setSelectedImages([])
+    setImagePreviews([])
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -265,23 +317,33 @@ export default function App() {
     const messageData = {
       type: 'update-agent-instructions',
       agentInstructions: agentInstructions.trim(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     }
 
     ws.current.sendMessage(messageData)
     setCurrentAgentInstructions(agentInstructions.trim())
-    
-    setMessages(prev => [
+
+    setMessages((prev) => [
       ...prev,
-      { type: 'system', text: `Agent instructions updated: "${agentInstructions.trim() || 'Default instructions'}"`, timestamp: Date.now() }
+      {
+        type: 'system',
+        text: `Agent instructions updated: "${
+          agentInstructions.trim() || 'Default instructions'
+        }"`,
+        timestamp: Date.now(),
+      },
     ])
   }
 
   const toggleRecording = async () => {
     if (!ws.current || !isAuthorized) {
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
-        { type: 'error', text: 'Cannot record audio: Not connected to server', timestamp: Date.now() }
+        {
+          type: 'error',
+          text: 'Cannot record audio: Not connected to server',
+          timestamp: Date.now(),
+        },
       ])
       return
     }
@@ -312,9 +374,13 @@ export default function App() {
     } else {
       const started = await audioService.current.startRecording()
       if (!started) {
-        setMessages(prev => [
+        setMessages((prev) => [
           ...prev,
-          { type: 'error', text: 'Failed to start recording', timestamp: Date.now() }
+          {
+            type: 'error',
+            text: 'Failed to start recording',
+            timestamp: Date.now(),
+          },
         ])
       } else {
         setIsRecording(true)
@@ -323,49 +389,70 @@ export default function App() {
   }
 
   const sendTextMessage = async () => {
-    if ((!inputText.trim() && !selectedImage) || !ws.current || !isAuthorized) return
+    if (
+      (!inputText.trim() && selectedImages.length === 0) ||
+      !ws.current ||
+      !isAuthorized
+    )
+      return
+
+    console.log('About to send message with images:', selectedImages.length)
+    console.log('Selected images array:', selectedImages)
 
     const messageData = {
       type: 'chat-message',
       text: inputText.trim(),
       agentInstructions: currentAgentInstructions,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     }
 
-    if (selectedImage) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const base64Data = reader.result.split(',')[1]
-        messageData.image = {
-          data: base64Data,
-          type: selectedImage.type,
-          name: selectedImage.name
-        }
-        
-        ws.current.sendMessage(messageData)
-        
-        setMessages(prev => [
-          ...prev,
-          { 
-            type: 'user', 
-            text: inputText.trim(), 
-            image: imagePreview,
-            timestamp: Date.now() 
+    if (selectedImages.length > 0) {
+      console.log('Processing images for sending...')
+      const imagePromises = selectedImages.map((file, index) => {
+        console.log(`Processing image ${index + 1}:`, file.name)
+        return new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const base64Data = reader.result.split(',')[1]
+            console.log(`Image ${index + 1} converted to base64, size:`, base64Data.length)
+            resolve({
+              data: base64Data,
+              type: file.type,
+              name: file.name,
+            })
           }
-        ])
-        
-        setInputText('')
-        removeImage()
-      }
-      reader.readAsDataURL(selectedImage)
-    } else {
+          reader.readAsDataURL(file)
+        })
+      })
+
+      const imageDataArray = await Promise.all(imagePromises)
+      console.log('All images processed, final array length:', imageDataArray.length)
+      messageData.images = imageDataArray
+
+      console.log('Sending message with images:', messageData.images.length)
       ws.current.sendMessage(messageData)
-      
-      setMessages(prev => [
+
+      setMessages((prev) => [
         ...prev,
-        { type: 'user', text: inputText.trim(), timestamp: Date.now() }
+        {
+          type: 'user',
+          text: inputText.trim(),
+          images: imagePreviews,
+          timestamp: Date.now(),
+        },
       ])
-      
+
+      setInputText('')
+      removeAllImages()
+    } else {
+      console.log('Sending text-only message')
+      ws.current.sendMessage(messageData)
+
+      setMessages((prev) => [
+        ...prev,
+        { type: 'user', text: inputText.trim(), timestamp: Date.now() },
+      ])
+
       setInputText('')
     }
   }
@@ -386,13 +473,21 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen bg-gray-100 flex flex-col relative ${isDragOver ? 'bg-blue-50' : ''}`}>
+    <div
+      className={`h-screen bg-gray-100 flex flex-col relative ${
+        isDragOver ? 'bg-blue-50' : ''
+      }`}
+    >
       {isDragOver && (
         <div className="absolute inset-0 bg-blue-500 bg-opacity-20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
           <div className="bg-white p-8 rounded-lg shadow-lg text-center">
             <div className="text-4xl mb-4">📷</div>
-            <div className="text-xl font-semibold text-gray-700">Drop image here</div>
-            <div className="text-sm text-gray-500 mt-2">Release to upload</div>
+            <div className="text-xl font-semibold text-gray-700">
+              Drop images here
+            </div>
+            <div className="text-sm text-gray-500 mt-2">
+              Release to upload multiple images
+            </div>
           </div>
         </div>
       )}
@@ -462,6 +557,18 @@ export default function App() {
                       : 'bg-red-100 text-red-800 border border-red-200'
                   }`}
                 >
+                  {message.images && message.images.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      {message.images.map((image, imgIndex) => (
+                        <img
+                          key={imgIndex}
+                          src={image}
+                          alt={`Uploaded ${imgIndex + 1}`}
+                          className="max-w-full h-auto rounded-lg"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {message.image && (
                     <img
                       src={message.image}
@@ -487,7 +594,7 @@ export default function App() {
           <div className="text-sm text-gray-600 text-center mb-4">
             {audioStatus || 'Click the microphone to start voice conversation'}
           </div>
-          
+
           <div className="flex justify-center mb-4">
             <button
               className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl transition-all ${
@@ -504,20 +611,36 @@ export default function App() {
             </button>
           </div>
 
-          {imagePreview && (
-            <div className="mb-4 flex justify-center">
-              <div className="relative inline-block">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="max-w-32 h-auto rounded-lg border"
-                />
+          {imagePreviews.length > 0 && (
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">
+                  {imagePreviews.length} image
+                  {imagePreviews.length > 1 ? 's' : ''} selected
+                </span>
                 <button
-                  onClick={removeImage}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                  onClick={removeAllImages}
+                  className="text-sm text-red-500 hover:text-red-700"
                 >
-                  ×
+                  Remove all
                 </button>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-20 object-cover rounded-lg border"
+                    />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -527,6 +650,7 @@ export default function App() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               onChange={handleImageSelect}
               className="hidden"
             />
@@ -549,15 +673,19 @@ export default function App() {
             />
             <button
               onClick={sendTextMessage}
-              disabled={(!inputText.trim() && !selectedImage) || !isAuthorized}
+              disabled={
+                (!inputText.trim() && selectedImages.length === 0) ||
+                !isAuthorized
+              }
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               Send
             </button>
           </div>
-          
+
           <div className="text-xs text-gray-500 text-center mt-2">
-            💡 Tip: You can paste (Ctrl+V) or drag & drop images directly into the chat
+            💡 Tip: You can paste (Ctrl+V) or drag & drop multiple images
+            directly into the chat
           </div>
         </div>
       </div>
