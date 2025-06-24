@@ -9,7 +9,6 @@ import DeepgramService from './services/DeepgramService.js'
 import GroqService from './services/GroqService.js'
 import { EventEmitter } from 'events'
 import url from 'url'
-import fs from 'fs'
 
 dotenv.config()
 
@@ -50,8 +49,14 @@ const __dirname = dirname(__filename)
 const app = express()
 const port = process.env.PORT || 7860
 
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ limit: '50mb', extended: true }))
+
 const server = http.createServer(app)
-const wss = new WebSocketServer({ server })
+const wss = new WebSocketServer({ 
+  server,
+  maxPayload: 50 * 1024 * 1024
+})
 
 app.use(express.static(path.join(__dirname, '../../dist')))
 
@@ -113,7 +118,6 @@ wss.on('connection', (ws, req) => {
   })
 
   eventEmitter.on('speech', ({ audio }) => {
-    // console.log('Send speech audio to client:', audio)
     ws.send(JSON.stringify({ type: 'speech', data: audio }))
   })
 
@@ -144,24 +148,17 @@ wss.on('connection', (ws, req) => {
       try {
         parsedMessage = JSON.parse(message.toString())
       } catch (jsonError) {
-        // const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-        // const filename = `audio_${timestamp}.raw`
-        // const filepath = path.join(__dirname, 'recordings', filename)
-
-        // if (!fs.existsSync(path.join(__dirname, 'recordings'))) {
-        //   fs.mkdirSync(path.join(__dirname, 'recordings'), { recursive: true })
-        // }
-
-        // fs.writeFileSync(filepath, message)
-        // console.log(`Raw audio saved to: ${filepath}`)
-
         sttService.sendMessage(message)
         return
       }
 
-      if (parsedMessage.type === 'timer-message') {
-        console.log('Received timer message:', parsedMessage.data)
-        groqService.processTranscription(parsedMessage.data)
+      if (parsedMessage.type === 'chat-message') {
+        console.log('Received chat message:', parsedMessage)
+        groqService.processChatMessage(parsedMessage)
+      } else if (parsedMessage.type === 'update-agent-instructions') {
+        console.log('Received agent instructions update:', parsedMessage.agentInstructions)
+        groqService.updateAgentInstructions(parsedMessage.agentInstructions)
+        ws.send(JSON.stringify({ type: 'agent-instructions-updated' }))
       } else {
         sttService.sendMessage(message)
       }

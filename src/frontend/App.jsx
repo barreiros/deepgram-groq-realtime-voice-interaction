@@ -1,54 +1,96 @@
 import React, { useState, useEffect, useRef } from 'react'
-import Scene from './components/Scene'
 import DeepgramWebSocketService from './services/deepgram/DeepgramWebSocketService'
 import { AudioRecordingService } from './audio/AudioRecordingService'
 import AudioPlaybackService from './audio/AudioPlaybackService'
 import SecretPrompt from './components/SecretPrompt'
 
 export default function App() {
-  console.log('env variables', import.meta.env)
   const [messages, setMessages] = useState([])
-  const [isRecording, setIsRecording] = useState(false)
-  const [isTimerActive, setIsTimerActive] = useState(false)
-  const [audioStatus, setAudioStatus] = useState('')
+  const [inputText, setInputText] = useState('')
+  const [agentInstructions, setAgentInstructions] = useState('')
+  const [currentAgentInstructions, setCurrentAgentInstructions] = useState('')
   const [showSecretPrompt, setShowSecretPrompt] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [audioStatus, setAudioStatus] = useState('')
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const ws = useRef(null)
   const audioService = useRef(null)
   const audioPlayback = useRef(null)
-  const sceneAPIRef = useRef(null)
-  const timerRef = useRef(null)
   const messagesContainerRef = useRef(null)
-  const lastScrollTime = useRef(Date.now())
+  const fileInputRef = useRef(null)
+  const chatInputRef = useRef(null)
   const sampleRate = 24000
-
-  const testMessages = [
-    'Hello, how are you?',
-    'Tell the name of 20 cities in the world.',
-    'Shut up',
-  ]
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current
-      const now = Date.now()
-      const timeSinceLastScroll = now - lastScrollTime.current
-
-      if (timeSinceLastScroll > 2000) {
-        setTimeout(() => {
-          container.scrollTop = container.scrollHeight
-        }, 0)
-      }
+      setTimeout(() => {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+      }, 100)
     }
-  }
-
-  const handleScroll = () => {
-    lastScrollTime.current = Date.now()
   }
 
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (file) {
+            handleImageFile(file)
+          }
+          break
+        }
+      }
+    }
+
+    const handleDragOver = (e) => {
+      e.preventDefault()
+      setIsDragOver(true)
+    }
+
+    const handleDragLeave = (e) => {
+      e.preventDefault()
+      if (!e.currentTarget.contains(e.relatedTarget)) {
+        setIsDragOver(false)
+      }
+    }
+
+    const handleDrop = (e) => {
+      e.preventDefault()
+      setIsDragOver(false)
+      
+      const files = e.dataTransfer?.files
+      if (files && files.length > 0) {
+        const file = files[0]
+        if (file.type.startsWith('image/')) {
+          handleImageFile(file)
+        }
+      }
+    }
+
+    document.addEventListener('paste', handlePaste)
+    document.addEventListener('dragover', handleDragOver)
+    document.addEventListener('dragleave', handleDragLeave)
+    document.addEventListener('drop', handleDrop)
+
+    return () => {
+      document.removeEventListener('paste', handlePaste)
+      document.removeEventListener('dragover', handleDragOver)
+      document.removeEventListener('dragleave', handleDragLeave)
+      document.removeEventListener('drop', handleDrop)
+    }
+  }, [])
 
   const handleSecretSubmit = (secret) => {
     initializeWebSocket(secret)
@@ -67,28 +109,24 @@ export default function App() {
           console.log('WebSocket connected successfully')
           setIsAuthorized(true)
           setShowSecretPrompt(false)
-          setMessages((prev) => [
-            ...prev,
-            { type: 'system', text: 'Connected to server successfully' },
+          setMessages([
+            { type: 'system', text: 'Connected to AI Agent successfully', timestamp: Date.now() }
           ])
         },
         onClose: () => {
           console.log('WebSocket disconnected')
           setIsAuthorized(false)
           setShowSecretPrompt(true)
-          setMessages((prev) => [
+          setMessages(prev => [
             ...prev,
-            { type: 'system', text: 'Disconnected from server' },
+            { type: 'system', text: 'Disconnected from server', timestamp: Date.now() }
           ])
         },
         onError: (error) => {
           console.error('WebSocket error:', error)
-          setMessages((prev) => [
+          setMessages(prev => [
             ...prev,
-            {
-              type: 'error',
-              text: 'Connection failed: Invalid secret or server error',
-            },
+            { type: 'error', text: 'Connection failed: Invalid secret or server error', timestamp: Date.now() }
           ])
           setShowSecretPrompt(true)
           setIsAuthorized(false)
@@ -103,7 +141,7 @@ export default function App() {
         listen_language: 'en',
         listen_model: 'nova-3',
         llm_model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-        llm_language: 'es',
+        llm_language: 'en',
         speech_model: 'aura-2-thalia-en',
       }
     )
@@ -120,18 +158,11 @@ export default function App() {
       if (audioService.current) {
         audioService.current.stopRecording()
       }
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
       if (ws.current) {
         ws.current.close()
       }
     }
   }, [])
-
-  const handleSceneReady = (api) => {
-    sceneAPIRef.current = api
-  }
 
   const handleAudioRecordingMessage = (message) => {
     if (message.type === 'audioData' && ws.current) {
@@ -157,14 +188,15 @@ export default function App() {
           )
           audioPlayback.current.playPcmAudio(int16Array)
         }
-      } else if (
-        message.type === 'llm-text' ||
-        message.type === 'transcription'
-      ) {
-        console.log('Received text from WebSocket:', message.data)
-        setMessages((prev) => [
+      } else if (message.type === 'llm-text') {
+        setMessages(prev => [
           ...prev,
-          { type: 'received', text: message.data },
+          { type: 'assistant', text: message.data, timestamp: Date.now() }
+        ])
+      } else if (message.type === 'transcription') {
+        setMessages(prev => [
+          ...prev,
+          { type: 'user', text: message.data, timestamp: Date.now() }
         ])
       } else if (message.type === 'shutup') {
         console.log('Shutup event received:', message.data)
@@ -172,15 +204,20 @@ export default function App() {
           audioPlayback.current.stopPlayback()
         }
         if (message.data) {
-          setMessages((prev) => [
+          setMessages(prev => [
             ...prev,
-            { type: 'system', text: message.data },
+            { type: 'system', text: message.data, timestamp: Date.now() }
           ])
         }
-      } else if (message.type === 'error') {
-        setMessages((prev) => [
+      } else if (message.type === 'agent-instructions-updated') {
+        setMessages(prev => [
           ...prev,
-          { type: 'error', text: message.message || 'Unknown error' },
+          { type: 'system', text: 'Agent instructions updated successfully', timestamp: Date.now() }
+        ])
+      } else if (message.type === 'error') {
+        setMessages(prev => [
+          ...prev,
+          { type: 'error', text: message.message || 'Unknown error', timestamp: Date.now() }
         ])
         if (message.message && message.message.includes('Unauthorized')) {
           setShowSecretPrompt(true)
@@ -198,11 +235,53 @@ export default function App() {
     }
   }
 
+  const handleImageFile = (file) => {
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreview(e.target.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0]
+    handleImageFile(file)
+  }
+
+  const removeImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const updateAgentInstructions = () => {
+    if (!ws.current || !isAuthorized) return
+
+    const messageData = {
+      type: 'update-agent-instructions',
+      agentInstructions: agentInstructions.trim(),
+      timestamp: Date.now()
+    }
+
+    ws.current.sendMessage(messageData)
+    setCurrentAgentInstructions(agentInstructions.trim())
+    
+    setMessages(prev => [
+      ...prev,
+      { type: 'system', text: `Agent instructions updated: "${agentInstructions.trim() || 'Default instructions'}"`, timestamp: Date.now() }
+    ])
+  }
+
   const toggleRecording = async () => {
     if (!ws.current || !isAuthorized) {
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
-        { type: 'error', text: 'Cannot record audio: Not connected to server' },
+        { type: 'error', text: 'Cannot record audio: Not connected to server', timestamp: Date.now() }
       ])
       return
     }
@@ -221,15 +300,8 @@ export default function App() {
         setAudioStatus(status)
         if (status === 'Recording stopped') {
           setIsRecording(false)
-          setMessages((prev) => [
-            ...prev,
-            { type: 'sent', text: 'Stopped audio recording' },
-          ])
         } else if (status.includes('Recording...')) {
-          setMessages((prev) => [
-            ...prev,
-            { type: 'sent', text: 'Started audio recording' },
-          ])
+          // Audio recording started
         }
       }
     }
@@ -240,9 +312,9 @@ export default function App() {
     } else {
       const started = await audioService.current.startRecording()
       if (!started) {
-        setMessages((prev) => [
+        setMessages(prev => [
           ...prev,
-          { type: 'error', text: 'Failed to start recording' },
+          { type: 'error', text: 'Failed to start recording', timestamp: Date.now() }
         ])
       } else {
         setIsRecording(true)
@@ -250,71 +322,63 @@ export default function App() {
     }
   }
 
-  const toggleTimer = () => {
-    if (!ws.current || !isAuthorized) {
-      setMessages((prev) => [
-        ...prev,
-        { type: 'error', text: 'Cannot start timer: Not connected to server' },
-      ])
-      return
+  const sendTextMessage = async () => {
+    if ((!inputText.trim() && !selectedImage) || !ws.current || !isAuthorized) return
+
+    const messageData = {
+      type: 'chat-message',
+      text: inputText.trim(),
+      agentInstructions: currentAgentInstructions,
+      timestamp: Date.now()
     }
 
-    if (isTimerActive) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      setIsTimerActive(false)
-      setMessages((prev) => [
-        ...prev,
-        { type: 'system', text: 'Timer stopped' },
-      ])
-    } else {
-      let messageIndex = 0
-      const message = testMessages[messageIndex]
-      ws.current.sendMessage({
-        type: 'timer-message',
-        data: message,
-      })
-      setMessages((prev) => [
-        ...prev,
-        { type: 'sent', text: `Timer: ${message}` },
-      ])
-      messageIndex++
-      timerRef.current = setInterval(() => {
-        if (messageIndex < testMessages.length) {
-          const message = testMessages[messageIndex]
-          ws.current.sendMessage({
-            type: 'timer-message',
-            data: message,
-          })
-          setMessages((prev) => [
-            ...prev,
-            { type: 'sent', text: `Timer: ${message}` },
-          ])
-          messageIndex++
-        } else {
-          if (timerRef.current) {
-            clearInterval(timerRef.current)
-            timerRef.current = null
-          }
-          setIsTimerActive(false)
-          setMessages((prev) => [
-            ...prev,
-            { type: 'system', text: 'Timer completed all messages' },
-          ])
+    if (selectedImage) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64Data = reader.result.split(',')[1]
+        messageData.image = {
+          data: base64Data,
+          type: selectedImage.type,
+          name: selectedImage.name
         }
-      }, 7000)
-
-      setIsTimerActive(true)
-      setMessages((prev) => [
+        
+        ws.current.sendMessage(messageData)
+        
+        setMessages(prev => [
+          ...prev,
+          { 
+            type: 'user', 
+            text: inputText.trim(), 
+            image: imagePreview,
+            timestamp: Date.now() 
+          }
+        ])
+        
+        setInputText('')
+        removeImage()
+      }
+      reader.readAsDataURL(selectedImage)
+    } else {
+      ws.current.sendMessage(messageData)
+      
+      setMessages(prev => [
         ...prev,
-        {
-          type: 'system',
-          text: 'Timer started - sending messages every 7 seconds',
-        },
+        { type: 'user', text: inputText.trim(), timestamp: Date.now() }
       ])
+      
+      setInputText('')
     }
+  }
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendTextMessage()
+    }
+  }
+
+  const clearChat = () => {
+    setMessages([])
   }
 
   if (showSecretPrompt) {
@@ -322,77 +386,179 @@ export default function App() {
   }
 
   return (
-    <div className="m-0 p-0 overflow-hidden h-full">
-      <Scene onSceneReady={handleSceneReady} />
-      <div className="fixed bottom-5 right-5 w-[300px] bg-black/80 rounded-lg p-4 text-white max-h-[400px] flex flex-col">
-        <div
-          ref={messagesContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto mb-2.5 flex flex-col gap-2 max-h-[300px] scrollbar-none"
-        >
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`px-3 py-2 rounded-2xl max-w-[80%] break-words whitespace-pre-wrap ${
-                msg.type === 'sent'
-                  ? 'bg-blue-500 self-end'
-                  : msg.type === 'received'
-                  ? 'bg-zinc-700 self-start'
-                  : msg.type === 'system'
-                  ? 'bg-yellow-600 self-center text-center'
-                  : 'bg-red-600 self-start'
-              }`}
+    <div className={`h-screen bg-gray-100 flex flex-col relative ${isDragOver ? 'bg-blue-50' : ''}`}>
+      {isDragOver && (
+        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-lg shadow-lg text-center">
+            <div className="text-4xl mb-4">📷</div>
+            <div className="text-xl font-semibold text-gray-700">Drop image here</div>
+            <div className="text-sm text-gray-500 mt-2">Release to upload</div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white shadow-sm border-b p-4">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">AI Voice Agent</h1>
+          <button
+            onClick={clearChat}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Clear Chat
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border-b p-4">
+        <div className="max-w-4xl mx-auto">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Agent Instructions
+          </label>
+          <div className="flex space-x-2">
+            <textarea
+              value={agentInstructions}
+              onChange={(e) => setAgentInstructions(e.target.value)}
+              placeholder="Enter instructions for the AI agent (e.g., 'You are a helpful coding assistant...')"
+              className="flex-1 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="2"
+            />
+            <button
+              onClick={updateAgentInstructions}
+              disabled={!isAuthorized}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
             >
-              {(() => {
-                const text =
-                  typeof msg.text === 'string'
-                    ? msg.text
-                    : JSON.stringify(msg.text)
-                return text.length > 200 ? text.slice(0, 200) + '...' : text
-              })()}
+              Update Agent
+            </button>
+          </div>
+          {currentAgentInstructions && (
+            <div className="mt-2 text-sm text-gray-600">
+              <strong>Current:</strong> {currentAgentInstructions}
             </div>
-          ))}
+          )}
         </div>
-        <div className="text-sm text-white/80 text-center my-1">
-          {audioStatus}
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        <div className="max-w-4xl mx-auto h-full flex flex-col">
+          <div
+            ref={messagesContainerRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4"
+          >
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${
+                  message.type === 'user' ? 'justify-end' : 'justify-start'
+                }`}
+              >
+                <div
+                  className={`max-w-[70%] rounded-lg p-4 ${
+                    message.type === 'user'
+                      ? 'bg-blue-500 text-white'
+                      : message.type === 'assistant'
+                      ? 'bg-white text-gray-800 shadow-sm border'
+                      : message.type === 'system'
+                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}
+                >
+                  {message.image && (
+                    <img
+                      src={message.image}
+                      alt="Uploaded"
+                      className="max-w-full h-auto rounded-lg mb-2"
+                    />
+                  )}
+                  <div className="whitespace-pre-wrap break-words">
+                    {message.text}
+                  </div>
+                  <div className="text-xs opacity-70 mt-2">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <button
-            className={`w-full flex items-center justify-center gap-2 py-2.5 px-2.5 border-none rounded text-white cursor-pointer transition-colors ${
-              isRecording
-                ? 'bg-red-600 animate-[pulse_1.5s_infinite]'
-                : isAuthorized
-                ? 'bg-zinc-700 hover:bg-zinc-600'
-                : 'bg-gray-500 cursor-not-allowed'
-            }`}
-            onClick={toggleRecording}
-            disabled={!isAuthorized}
-          >
-            <span
-              className={`w-3 h-3 rounded-full bg-white ${
-                isRecording ? 'animate-[blink_1s_infinite]' : ''
+      </div>
+
+      <div className="bg-white border-t p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-sm text-gray-600 text-center mb-4">
+            {audioStatus || 'Click the microphone to start voice conversation'}
+          </div>
+          
+          <div className="flex justify-center mb-4">
+            <button
+              className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl transition-all ${
+                isRecording
+                  ? 'bg-red-600 animate-pulse shadow-lg'
+                  : isAuthorized
+                  ? 'bg-blue-600 hover:bg-blue-700 shadow-md'
+                  : 'bg-gray-400 cursor-not-allowed'
               }`}
-            ></span>
-            {isRecording ? 'Stop Recording' : 'Record Audio'}
-          </button>
-          <button
-            className={`w-full flex items-center justify-center gap-2 py-2.5 px-2.5 border-none rounded text-white cursor-pointer transition-colors ${
-              isTimerActive
-                ? 'bg-orange-600 animate-[pulse_1.5s_infinite]'
-                : isAuthorized
-                ? 'bg-zinc-700 hover:bg-zinc-600'
-                : 'bg-gray-500 cursor-not-allowed'
-            }`}
-            onClick={toggleTimer}
-            disabled={!isAuthorized}
-          >
-            <span
-              className={`w-3 h-3 rounded-full bg-white ${
-                isTimerActive ? 'animate-[blink_1s_infinite]' : ''
-              }`}
-            ></span>
-            {isTimerActive ? 'Stop Timer' : 'Start Timer'}
-          </button>
+              onClick={toggleRecording}
+              disabled={!isAuthorized}
+            >
+              🎤
+            </button>
+          </div>
+
+          {imagePreview && (
+            <div className="mb-4 flex justify-center">
+              <div className="relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="max-w-32 h-auto rounded-lg border"
+                />
+                <button
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex space-x-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              disabled={!isAuthorized}
+            >
+              📎
+            </button>
+            <textarea
+              ref={chatInputRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message, paste/drag images, or use voice..."
+              className="flex-1 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="1"
+              disabled={!isAuthorized}
+            />
+            <button
+              onClick={sendTextMessage}
+              disabled={(!inputText.trim() && !selectedImage) || !isAuthorized}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+              Send
+            </button>
+          </div>
+          
+          <div className="text-xs text-gray-500 text-center mt-2">
+            💡 Tip: You can paste (Ctrl+V) or drag & drop images directly into the chat
+          </div>
         </div>
       </div>
     </div>

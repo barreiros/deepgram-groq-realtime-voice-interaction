@@ -5,7 +5,9 @@ import {
 } from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import { ConversationSummaryBufferMemory } from 'langchain/memory'
+import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import SentenceCompletion from '../tools/SentenceCompletion.js'
+import Groq from 'groq-sdk'
 
 class GroqService {
   constructor(apiKey, eventEmitter, params = {}) {
@@ -14,14 +16,20 @@ class GroqService {
     this.lastActivityTime = Date.now()
     this.silenceTimeout = null
     this.transcriptionBuffer = ''
+    this.eventEmitter = eventEmitter
+    this.currentAgentInstructions =
+      'You are a helpful AI assistant. Respond naturally and be concise but informative.'
+
     this.chatModel = new ChatGroq({
       apiKey: apiKey,
-      model:
-        this.params.llm_model ||
-        'meta-llama/llama-4-maverick-17b-128e-instruct',
+      model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
       temperature: this.params.llm_temp
         ? parseFloat(this.params.llm_temp)
         : 0.7,
+    })
+
+    this.nativeGroq = new Groq({
+      apiKey: apiKey,
     })
 
     this.memoryModel = new ChatGroq({
@@ -35,15 +43,23 @@ class GroqService {
       temperature: 0.1,
     })
 
+    this.imageModel = 'meta-llama/llama-4-scout-17b-16e-instruct'
+
     this.memory = new ConversationSummaryBufferMemory({
       llm: this.memoryModel,
       maxTokenLimit: 1000,
       returnMessages: true,
     })
 
-    this.eventEmitter = eventEmitter
     this.setupChat()
     this.setupShutup()
+  }
+
+  updateAgentInstructions(instructions) {
+    this.currentAgentInstructions =
+      instructions ||
+      'You are a helpful AI assistant. Respond naturally and be concise but informative.'
+    console.log('Agent instructions updated to:', this.currentAgentInstructions)
   }
 
   setupShutup() {
@@ -79,12 +95,7 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
 
   setupChat() {
     this.prompt = ChatPromptTemplate.fromMessages([
-      [
-        'system',
-        `You are a helpful english tutor. Please, make short responses.
-
-Respond naturally to the user's input. Focus on being helpful and educational.`,
-      ],
+      ['system', '{system_message}'],
       new MessagesPlaceholder('chat_history'),
       ['human', '{input}'],
     ])
@@ -140,7 +151,7 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
         const shutupResponse = await this.shutupChain.invoke({
           input: this.transcriptionBuffer,
         })
-        
+
         if (shutupResponse && shutupResponse.trim() === 'INTERRUPT') {
           this.eventEmitter.emit('shutup', {
             message: 'Conversation stopped by user request',
@@ -152,7 +163,110 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
     }
   }
 
-  async processBuffer(textToSend) {
+  async processChatMessage(messageData) {
+    try {
+      const { text, image, agentInstructions } = messageData
+
+      const systemMessage = agentInstructions || this.currentAgentInstructions
+
+      if (image) {
+        await this.processImageMessage(text, image, systemMessage)
+      } else {
+        await this.processTextMessage(text, systemMessage)
+      }
+    } catch (error) {
+      console.error('Error processing chat message:', error)
+      this.eventEmitter.emit('error', { error: error.message })
+    }
+  }
+
+  async processImageMessage(text, imageData, systemMessage) {
+    try {
+      const imageUrl = `data:${imageData.type};base64,${imageData.data}`
+
+      const imageDescriptionMessages = [
+        {
+          role: 'system',
+          content:
+            'You are an image description assistant. Describe what you see in the image in detail, focusing on important visual elements, objects, people, text, and context.',
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Describe this image in detail.',
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageUrl,
+              },
+            },
+          ],
+        },
+      ]
+
+      const descriptionResponse = await this.nativeGroq.chat.completions.create(
+        {
+          model: this.imageModel,
+          messages: imageDescriptionMessages,
+          temperature: 0.3,
+          max_tokens: 500,
+        }
+      )
+
+      let imageDescription = ''
+      if (
+        descriptionResponse &&
+        descriptionResponse.choices &&
+        descriptionResponse.choices[0] &&
+        descriptionResponse.choices[0].message &&
+        descriptionResponse.choices[0].message.content
+      ) {
+        imageDescription = descriptionResponse.choices[0].message.content.trim()
+        console.log('Image description generated:', imageDescription)
+      }
+
+      const userQuery = text || 'What can you tell me about this image?'
+
+      await this.memory.saveContext(
+        { input: `${userQuery} [Image description: ${imageDescription}]` },
+        { output: '' }
+      )
+    } catch (error) {
+      console.error('Error processing image message:', error)
+      this.eventEmitter.emit('error', { error: error.message })
+    }
+  }
+
+  async processTextMessage(text, systemMessage) {
+    try {
+      const chatHistory = await this.memory.loadMemoryVariables({})
+
+      const response = await this.conversationChain.invoke({
+        input: text,
+        system_message: systemMessage,
+        chat_history: chatHistory.history || [],
+      })
+
+      if (response && response.trim().length > 0) {
+        this.eventEmitter.emit('llm-text', {
+          text: response.trim(),
+          language: this.language,
+        })
+
+        await this.memory.saveContext({ input: text }, { output: response })
+      }
+
+      this.startSilenceTimeout()
+    } catch (error) {
+      console.error('Error processing text message:', error)
+      this.eventEmitter.emit('error', { error: error.message })
+    }
+  }
+
+  async processBuffer(textToSend, systemMessage = null) {
     console.log('Processing buffer:', textToSend)
     console.log(
       'Sentence complete check:',
@@ -160,9 +274,12 @@ Respond naturally to the user's input. Focus on being helpful and educational.`,
     )
     try {
       const chatHistory = await this.memory.loadMemoryVariables({})
+      const effectiveSystemMessage =
+        systemMessage || this.currentAgentInstructions
 
       const response = await this.conversationChain.invoke({
         input: textToSend,
+        system_message: effectiveSystemMessage,
         chat_history: chatHistory.history || [],
       })
 

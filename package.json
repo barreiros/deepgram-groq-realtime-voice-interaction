@@ -29,6 +29,7 @@
     "compromise": "^14.14.4",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "groq-sdk": "^0.8.0",
     "langchain": "^0.3.23",
     "node-wav": "^0.0.2",
     "react": "^19.0.0",
