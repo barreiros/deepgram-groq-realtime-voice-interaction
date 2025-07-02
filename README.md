@@ -1,5 +1,5 @@
 ---
-title: Deepgram Groq Realtime Voice Interaction
+title: Intelligent conversation with voice and vision
 emoji: 🗣️
 colorFrom: gray
 colorTo: blue

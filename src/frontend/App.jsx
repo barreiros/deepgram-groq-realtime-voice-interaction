@@ -430,7 +430,7 @@ export default function App() {
 
   return (
     <div
-      className={`h-screen bg-gray-100 flex flex-col relative ${
+      className={`h-screen bg-gray-50 flex flex-col relative ${
         isDragOver ? 'bg-blue-50' : ''
       }`}
     >
@@ -448,47 +448,6 @@ export default function App() {
         </div>
       )}
 
-      <div className="bg-white shadow-sm border-b p-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">AI Voice Agent</h1>
-          <button
-            onClick={clearChat}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-          >
-            Clear Chat
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-blue-50 border-b p-4">
-        <div className="max-w-4xl mx-auto">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Agent Instructions
-          </label>
-          <div className="flex space-x-2">
-            <textarea
-              value={agentInstructions}
-              onChange={(e) => setAgentInstructions(e.target.value)}
-              placeholder="Enter instructions for the AI agent (e.g., 'You are a helpful coding assistant...')"
-              className="flex-1 p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows="2"
-            />
-            <button
-              onClick={updateAgentInstructions}
-              disabled={!isAuthorized}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowe transition-colors whitespace-nowrap"
-            >
-              Update Agent
-            </button>
-          </div>
-          {currentAgentInstructions && (
-            <div className="mt-2 text-sm text-gray-600">
-              <strong>Current:</strong> {currentAgentInstructions}
-            </div>
-          )}
-        </div>
-      </div>
-
       <Chat
         messages={messages}
         onSendMessage={handleSendMessage}
@@ -500,31 +459,14 @@ export default function App() {
         imagePreviews={imagePreviews}
         isAuthorized={isAuthorized}
         isDragOver={isDragOver}
+        isRecording={isRecording}
+        toggleRecording={toggleRecording}
+        agentInstructions={agentInstructions}
+        setAgentInstructions={setAgentInstructions}
+        currentAgentInstructions={currentAgentInstructions}
+        updateAgentInstructions={updateAgentInstructions}
+        clearChat={clearChat}
       />
-
-      <div className="bg-white border-t p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-sm text-gray-600 text-center mb-4">
-            {audioStatus || 'Click the microphone to start voice conversation'}
-          </div>
-
-          <div className="flex justify-center mb-4">
-            <button
-              className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl transition-all ${
-                isRecording
-                  ? 'bg-red-600 animate-pulse shadow-lg'
-                  : isAuthorized
-                  ? 'bg-blue-600 hover:bg-blue-700 shadow-md'
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
-              onClick={toggleRecording}
-              disabled={!isAuthorized}
-            >
-              🎤
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
