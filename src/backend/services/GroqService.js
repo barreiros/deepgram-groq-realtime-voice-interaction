@@ -73,15 +73,36 @@ class GroqService {
     this.shutupPrompt = ChatPromptTemplate.fromMessages([
       [
         'system',
-        `You are an interruption detection assistant. Your job is to determine if the user wants to interrupt or stop the conversation.
+        `You are a conversation flow detector. Your job is to decide whether a user's message means:
 
-Analyze the user's input and respond with exactly one of these:
-- "INTERRUPT" if the user wants to stop, pause, wait, hold on, or interrupt
-- "CONTINUE" if the user is continuing normal conversation
+- "COMPLETE" — they finished speaking and expect a reply.
+- "CONTINUE" — they are still speaking or their thought is incomplete.
+- "INTERRUPT" — they said something like "stop", "pause", or "wait".
 
-Look for words like: stop, pause, wait, hold on, interrupt, enough, quiet, silence
+Respond with ONLY one of these three words.
 
-Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
+Here are some examples:
+
+User: I need help with something.
+Label: COMPLETE
+
+User: I was thinking maybe we could...
+Label: CONTINUE
+
+User: Wait, hold on.
+Label: INTERRUPT
+
+User: My name is David. But people call me Pedro. Pedro. What's your name?
+Label: COMPLETE
+
+User: I don't know if it's working because when I try to...
+Label: CONTINUE
+
+User: Sorry. I don't like to talk about my name. I wanna I wanna learn vectorized databases. Could you help me?
+Label: COMPLETE
+
+User:
+`,
       ],
       ['human', '{input}'],
     ])
@@ -130,7 +151,33 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
     ) {
       const completeSentence = this.transcriptionBuffer
       this.transcriptionBuffer = ''
-      await this.processBuffer(completeSentence)
+      this.eventEmitter.emit('shutup', {})
+
+      try {
+        const chatHistory = await this.memory.loadMemoryVariables({})
+        const effectiveSystemMessage = this.getEffectiveSystemMessage()
+
+        const response = await this.conversationChain.invoke({
+          input: completeSentence,
+          system_message: effectiveSystemMessage,
+          chat_history: chatHistory.history || [],
+        })
+
+        if (response && response.trim().length > 0) {
+          this.eventEmitter.emit('llm-text', {
+            text: response.trim(),
+            language: this.language,
+          })
+
+          await this.memory.saveContext(
+            { input: completeSentence },
+            { output: response }
+          )
+        }
+      } catch (error) {
+        console.error('Error processing inactive buffer:', error)
+        this.eventEmitter.emit('error', { error: error.message })
+      }
     }
   }
 
@@ -143,31 +190,81 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
       (this.transcriptionBuffer || '') + spacedTranscription
 
     if (this.bufferTimeout) clearTimeout(this.bufferTimeout)
-    this.startSilenceTimeout()
+    // this.startSilenceTimeout()
 
-    if (
-      SentenceCompletion.isComplete(this.transcriptionBuffer, this.language)
-    ) {
-      console.log('Sentence is complete:', this.transcriptionBuffer)
-      const completeSentence = this.transcriptionBuffer
-      this.transcriptionBuffer = ''
-      this.eventEmitter.emit('shutup', {})
-      await this.processBuffer(completeSentence)
-    } else {
-      try {
-        const shutupResponse = await this.shutupChain.invoke({
-          input: this.transcriptionBuffer,
+    try {
+      // Start both shutup detection and chat processing in parallel
+      const shutupPromise = this.shutupChain.invoke({
+        input: this.transcriptionBuffer,
+      })
+
+      const chatPromise = this.prepareChatResponse()
+
+      // Wait for shutup detection first (it's faster)
+      const shutupResponse = await shutupPromise
+
+      console.log(
+        'Shutup detection response:',
+        shutupResponse,
+        'for input:',
+        this.transcriptionBuffer
+      )
+
+      if (shutupResponse && shutupResponse.trim() === 'INTERRUPT') {
+        // User wants to interrupt - clear buffer and emit shutup
+        this.transcriptionBuffer = ''
+        this.eventEmitter.emit('shutup', {
+          message: 'Conversation stopped by user request',
         })
+        // Chat response is discarded since user interrupted
+      } else if (shutupResponse && shutupResponse.trim() === 'COMPLETE') {
+        // User finished speaking - emit shutup and wait for chat response
+        console.log(
+          'User utterance complete, processing:',
+          this.transcriptionBuffer
+        )
+        const completeSentence = this.transcriptionBuffer
+        this.transcriptionBuffer = ''
+        this.eventEmitter.emit('shutup', {})
 
-        if (shutupResponse && shutupResponse.trim() === 'INTERRUPT') {
-          this.eventEmitter.emit('shutup', {
-            message: 'Conversation stopped by user request',
-          })
+        // Now wait for the chat response and use it
+        try {
+          const response = await chatPromise
+          if (response && response.trim().length > 0) {
+            this.eventEmitter.emit('llm-text', {
+              text: response.trim(),
+              language: this.language,
+            })
+            await this.memory.saveContext(
+              { input: completeSentence },
+              { output: response }
+            )
+          }
+        } catch (error) {
+          console.error('Error processing complete utterance:', error)
+          this.eventEmitter.emit('error', { error: error.message })
         }
-      } catch (error) {
-        console.error('Error in shutup detection:', error)
       }
+      // If CONTINUE, do nothing - keep accumulating transcription
+      // Chat response is discarded since user is still speaking
+    } catch (error) {
+      console.error('Error in shutup detection:', error)
+      // Fallback - just emit shutup event without processing
+      this.eventEmitter.emit('shutup', {
+        message: 'Shutup filter failed, stopping processing',
+      })
     }
+  }
+
+  async prepareChatResponse() {
+    const chatHistory = await this.memory.loadMemoryVariables({})
+    const effectiveSystemMessage = this.getEffectiveSystemMessage()
+
+    return this.conversationChain.invoke({
+      input: this.transcriptionBuffer,
+      system_message: effectiveSystemMessage,
+      chat_history: chatHistory.history || [],
+    })
   }
 
   async processChatMessage(messageData) {
@@ -316,51 +413,6 @@ Be very strict - only respond "INTERRUPT" for clear interruption signals.`,
       this.startSilenceTimeout()
     } catch (error) {
       console.error('Error processing text message:', error)
-      this.eventEmitter.emit('error', { error: error.message })
-    }
-  }
-
-  async processBuffer(textToSend, systemMessage = null) {
-    console.log('Processing buffer:', textToSend)
-    console.log(
-      'Sentence complete check:',
-      SentenceCompletion.isComplete(textToSend)
-    )
-    try {
-      const chatHistory = await this.memory.loadMemoryVariables({})
-      const effectiveSystemMessage =
-        this.getEffectiveSystemMessage(systemMessage)
-
-      const response = await this.conversationChain.invoke({
-        input: textToSend,
-        system_message: effectiveSystemMessage,
-        chat_history: chatHistory.history || [],
-      })
-
-      if (response && response.trim().length > 0) {
-        let llmResponseBuffer = response
-
-        if (SentenceCompletion.isComplete(llmResponseBuffer, this.language)) {
-          this.eventEmitter.emit('llm-text', {
-            text: llmResponseBuffer.trim(),
-            language: this.language,
-          })
-        } else {
-          this.eventEmitter.emit('llm-text', {
-            text: llmResponseBuffer.trim(),
-            language: this.language,
-          })
-        }
-
-        await this.memory.saveContext(
-          { input: textToSend },
-          { output: response }
-        )
-      }
-
-      this.startSilenceTimeout()
-    } catch (error) {
-      console.error('Error processing buffer:', error)
       this.eventEmitter.emit('error', { error: error.message })
     }
   }
