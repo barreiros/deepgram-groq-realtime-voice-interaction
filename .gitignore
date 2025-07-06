@@ -23,3 +23,7 @@ package-lock.json
 .DS_Store
 Thumbs.db
 .aider*
+
+# Hugging Face models and cache
+huggingface/
+.cache/huggingface/

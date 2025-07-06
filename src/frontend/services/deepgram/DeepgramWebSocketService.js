@@ -1,4 +1,4 @@
-import BaseWebSocketService from '../websocket/BaseWebSocketService'
+import BaseWebSocketService from '../websocket/BaseWebSocketService.js'
 
 class DeepgramWebSocketService extends BaseWebSocketService {
   constructor(callbacks = {}, options = {}) {
@@ -10,7 +10,7 @@ class DeepgramWebSocketService extends BaseWebSocketService {
       }
     })
 
-    super(wsUrl.toString(), {})
+    super(wsUrl.toString(), callbacks)
     this.callbacks = callbacks
     this.options = options
   }

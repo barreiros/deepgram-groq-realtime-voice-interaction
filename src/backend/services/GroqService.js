@@ -10,7 +10,7 @@ import SentenceCompletion from '../tools/SentenceCompletion.js'
 import Groq from 'groq-sdk'
 
 class GroqService {
-  constructor(apiKey, eventEmitter, params = {}) {
+  constructor(apiKey, eventEmitter, sentenceDetector, params = {}) {
     this.params = params
     this.language = params.llm_langugage || 'en'
     this.lastActivityTime = Date.now()
@@ -39,12 +39,6 @@ class GroqService {
       model: 'llama3-8b-8192',
     })
 
-    this.shutupModel = new ChatGroq({
-      apiKey: apiKey,
-      model: 'llama3-8b-8192',
-      temperature: 0.1,
-    })
-
     this.imageModel = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
     this.memory = new ConversationSummaryBufferMemory({
@@ -53,8 +47,10 @@ class GroqService {
       returnMessages: true,
     })
 
+    this.sentenceDetector = sentenceDetector
+    this.sentenceDetector.addConnection()
+
     this.setupChat()
-    this.setupShutup()
   }
 
   updateAgentInstructions(instructions) {
@@ -67,50 +63,6 @@ class GroqService {
   getEffectiveSystemMessage(customInstructions = null) {
     const baseInstructions = customInstructions || this.currentAgentInstructions
     return `${baseInstructions}\n\n${this.defaultInstructions}`
-  }
-
-  setupShutup() {
-    this.shutupPrompt = ChatPromptTemplate.fromMessages([
-      [
-        'system',
-        `You are a conversation flow detector. Your job is to decide whether a user's message means:
-
-- "COMPLETE" — they finished speaking and expect a reply.
-- "CONTINUE" — they are still speaking or their thought is incomplete.
-- "INTERRUPT" — they said something like "stop", "pause", or "wait".
-
-Respond with ONLY one of these three words.
-
-Here are some examples:
-
-User: I need help with something.
-Label: COMPLETE
-
-User: I was thinking maybe we could...
-Label: CONTINUE
-
-User: Wait, hold on.
-Label: INTERRUPT
-
-User: My name is David. But people call me Pedro. Pedro. What's your name?
-Label: COMPLETE
-
-User: I don't know if it's working because when I try to...
-Label: CONTINUE
-
-User: Sorry. I don't like to talk about my name. I wanna I wanna learn vectorized databases. Could you help me?
-Label: COMPLETE
-
-User:
-`,
-      ],
-      ['human', '{input}'],
-    ])
-
-    const shutupChain = this.shutupPrompt
-      .pipe(this.shutupModel)
-      .pipe(new StringOutputParser())
-    this.shutupChain = shutupChain
   }
 
   clearBuffers() {
@@ -132,16 +84,6 @@ User:
       .pipe(this.chatModel)
       .pipe(new StringOutputParser())
     this.conversationChain = chain
-  }
-
-  startSilenceTimeout() {
-    if (this.silenceTimeout) clearTimeout(this.silenceTimeout)
-
-    this.silenceTimeout = setTimeout(() => {
-      if (Date.now() - this.lastActivityTime >= 3000) {
-        this.processBufferIfInactive()
-      }
-    }, 3000)
   }
 
   async processBufferIfInactive() {
@@ -190,35 +132,29 @@ User:
       (this.transcriptionBuffer || '') + spacedTranscription
 
     if (this.bufferTimeout) clearTimeout(this.bufferTimeout)
-    // this.startSilenceTimeout()
 
     try {
-      // Start both shutup detection and chat processing in parallel
-      const shutupPromise = this.shutupChain.invoke({
-        input: this.transcriptionBuffer,
-      })
+      const detectionPromise = this.sentenceDetector.detectSentenceCompletion(
+        this.transcriptionBuffer
+      )
 
       const chatPromise = this.prepareChatResponse()
 
-      // Wait for shutup detection first (it's faster)
-      const shutupResponse = await shutupPromise
+      const detectionResult = await detectionPromise
 
       console.log(
-        'Shutup detection response:',
-        shutupResponse,
+        'Sentence detection result:',
+        detectionResult,
         'for input:',
         this.transcriptionBuffer
       )
 
-      if (shutupResponse && shutupResponse.trim() === 'INTERRUPT') {
-        // User wants to interrupt - clear buffer and emit shutup
+      if (detectionResult.status === 'INTERRUPT') {
         this.transcriptionBuffer = ''
         this.eventEmitter.emit('shutup', {
           message: 'Conversation stopped by user request',
         })
-        // Chat response is discarded since user interrupted
-      } else if (shutupResponse && shutupResponse.trim() === 'COMPLETE') {
-        // User finished speaking - emit shutup and wait for chat response
+      } else if (detectionResult.status === 'COMPLETE') {
         console.log(
           'User utterance complete, processing:',
           this.transcriptionBuffer
@@ -227,7 +163,6 @@ User:
         this.transcriptionBuffer = ''
         this.eventEmitter.emit('shutup', {})
 
-        // Now wait for the chat response and use it
         try {
           const response = await chatPromise
           if (response && response.trim().length > 0) {
@@ -245,13 +180,10 @@ User:
           this.eventEmitter.emit('error', { error: error.message })
         }
       }
-      // If CONTINUE, do nothing - keep accumulating transcription
-      // Chat response is discarded since user is still speaking
     } catch (error) {
-      console.error('Error in shutup detection:', error)
-      // Fallback - just emit shutup event without processing
+      console.error('Error in sentence detection:', error)
       this.eventEmitter.emit('shutup', {
-        message: 'Shutup filter failed, stopping processing',
+        message: 'Sentence detection failed, stopping processing',
       })
     }
   }
@@ -409,11 +341,15 @@ User:
 
         await this.memory.saveContext({ input: text }, { output: response })
       }
-
-      this.startSilenceTimeout()
     } catch (error) {
       console.error('Error processing text message:', error)
       this.eventEmitter.emit('error', { error: error.message })
+    }
+  }
+
+  close() {
+    if (this.sentenceDetector) {
+      this.sentenceDetector.removeConnection()
     }
   }
 }

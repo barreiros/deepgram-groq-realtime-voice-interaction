@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  ai-voice-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_WS_URL: ws://localhost:7860
+    ports:
+      - "7860:7860"
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SECRET=${SECRET}
+      - VITE_WS_URL=ws://localhost:7860
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev

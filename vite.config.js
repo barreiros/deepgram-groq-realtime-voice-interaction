@@ -11,16 +11,10 @@ export default defineConfig(({ mode }) => {
       postcss: './postcss.config.js',
     },
     server: {
-      port: 3000,
-      open: true,
-      cors: true,
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3001',
-          changeOrigin: true,
-          secure: false,
-        },
-      },
+      host: true,
+      port: 5173,
+      open: false,
+      cors: true
     },
     build: {
       outDir: '../../dist',
@@ -29,4 +23,4 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
     },
   }
-})
+}

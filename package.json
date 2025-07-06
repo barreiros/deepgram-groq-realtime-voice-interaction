@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start:frontend": "vite src/frontend",
+    "start:frontend": "vite src/frontend --host 0.0.0.0 --port 5173",
     "start:backend": "nodemon --watch src/backend src/backend/server.js",
     "dev": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
     "build": "vite build",

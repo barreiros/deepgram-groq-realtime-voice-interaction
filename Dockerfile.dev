@@ -1,6 +1,6 @@
 FROM node:24-slim
 
-# Set environment variables to control CPU threading and HuggingFace caching
+# Set environment variables to limit CPU thread usage and caching
 ENV HF_HOME=/app/huggingface \
     TRANSFORMERS_CACHE=/app/huggingface \
     OMP_NUM_THREADS=1 \
@@ -10,15 +10,14 @@ ENV HF_HOME=/app/huggingface \
     TOKENIZERS_PARALLELISM=false \
     CUDA_VISIBLE_DEVICES='' \
     PYTHONUNBUFFERED=1 \
-    NODE_ENV=production
+    NODE_ENV=development
 
-# Install Python and system dependencies
+# Install Python and build tools
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-dev \
     build-essential \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -27,29 +26,27 @@ WORKDIR /app
 COPY package*.json ./
 COPY requirements.txt ./
 
-# Install Python dependencies
+# Install Python dependencies (CPU-safe)
 RUN pip3 install --break-system-packages -r requirements.txt
 
-# Preload the Sentence Transformer model (in production: 'paraphrase-MiniLM-L12-v2')
+# Pre-download Sentence Transformers model (to avoid downloading at runtime)
 RUN python3 -c "\
 from sentence_transformers import SentenceTransformer; \
-SentenceTransformer('paraphrase-MiniLM-L12-v2', device='cpu', cache_folder='/app/huggingface')"
+SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/app/huggingface')"
 
-# Install Node dependencies (production only)
-RUN npm ci --omit=dev
+# Install Node.js dependencies
+RUN npm install
 
-# Copy the entire app
+# Copy all project files
 COPY . .
 
 # Define build-time argument
 ARG VITE_WS_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
-# Build the production frontend
-RUN npm run build
-
-# Expose backend port
+# Expose backend and frontend ports
 EXPOSE 7860
+EXPOSE 5173
 
-# Run backend only in production (assumes frontend is statically built)
-CMD ["npm", "start"]
+# Start both backend and frontend in development mode
+CMD ["npm", "run", "dev"]

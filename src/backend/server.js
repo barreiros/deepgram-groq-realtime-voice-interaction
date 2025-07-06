@@ -7,8 +7,10 @@ import { dirname } from 'path'
 import dotenv from 'dotenv'
 import DeepgramService from './services/DeepgramService.js'
 import GroqService from './services/GroqService.js'
+import SentenceDetectionService from './services/SentenceDetectionService.js'
 import { EventEmitter } from 'events'
 import url from 'url'
+import fs from 'fs'
 
 dotenv.config()
 
@@ -58,11 +60,30 @@ const wss = new WebSocketServer({
   maxPayload: 50 * 1024 * 1024
 })
 
-app.use(express.static(path.join(__dirname, '../../dist')))
+const sentenceService = new SentenceDetectionService()
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../dist/index.html'))
-})
+const distPath = path.join(__dirname, '../../dist')
+
+if (fs.existsSync(distPath)) {
+  console.log('Serving static files from dist directory (production mode)')
+  app.use(express.static(distPath))
+  
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+} else {
+  console.log('Development mode - backend only, frontend should be served separately')
+  
+  app.get('/', (req, res) => {
+    res.json({ 
+      message: 'AI Voice Agent Backend Server', 
+      mode: 'development',
+      note: 'Frontend should be served by Vite dev server on port 5173',
+      websocket: `ws://localhost:${port}`,
+      status: 'Backend ready'
+    })
+  })
+}
 
 app.get('/api/status', (req, res) => {
   res.json({ status: 'Server is running' })
@@ -86,7 +107,7 @@ wss.on('connection', (ws, req) => {
   const eventEmitter = new EventEmitter()
 
   console.log('Query parameters:', queryParams)
-  const groqService = new GroqService(GROQ_API_KEY, eventEmitter, queryParams)
+  const groqService = new GroqService(GROQ_API_KEY, eventEmitter, sentenceService, queryParams)
 
   const sttService = new DeepgramService(
     DEEPGRAM_API_KEY,
@@ -180,6 +201,28 @@ wss.on('connection', (ws, req) => {
       console.log('Closing tts connection')
       ttsService.close()
     }
+    if (groqService) {
+      console.log('Closing groq service')
+      groqService.close()
+    }
+  })
+})
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, shutting down gracefully...')
+  sentenceService.close()
+  server.close(() => {
+    console.log('Server closed')
+    process.exit(0)
+  })
+})
+
+process.on('SIGINT', () => {
+  console.log('Received SIGINT, shutting down gracefully...')
+  sentenceService.close()
+  server.close(() => {
+    console.log('Server closed')
+    process.exit(0)
   })
 })
 
