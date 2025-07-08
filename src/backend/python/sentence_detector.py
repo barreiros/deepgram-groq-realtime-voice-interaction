@@ -13,6 +13,14 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 os.environ['NUMEXPR_NUM_THREADS'] = '1'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
+# Pre-import torch and set threading parameters before any other imports
+try:
+    import torch
+    torch.set_num_threads(1)
+    # Don't call set_num_interop_threads here as it's causing the error
+except ImportError:
+    pass
+
 model = None
 complete_embeds = None
 incomplete_embeds = None
@@ -40,7 +48,15 @@ INCOMPLETE_EXAMPLES = [
     "The reason I said that is",
     "If we could just",
     "And then I would",
-    "Because the problem is"
+    "Because the problem is",
+    "And give me",
+    "But I need to",
+    "So if you could",
+    "And tell me about",
+    "Could you please give me",
+    "I want you to explain",
+    "When you consider the",
+    "As I was saying about the"
 ]
 
 # Shutdown handler
@@ -54,21 +70,41 @@ signal.signal(signal.SIGINT, handle_signal)
 # Rule-based fallback
 def rule_based(text):
     txt = text.lower().strip()
+    # Check for interruption words
     if any(word in txt for word in INTERRUPT_WORDS):
         return "INTERRUPT"
+    
+    # Check for ending punctuation that indicates completion
     if re.search(r"[.!?]$", txt):
         return "COMPLETE"
-    if len(txt.split()) < 3:
+    
+    # Short phrases are likely incomplete
+    if len(txt.split()) < 4:
         return "CONTINUE"
+    
+    # Check for common incomplete phrase starters
+    incomplete_starters = ["and", "but", "so", "or", "if", "when", "because", "while", "as"]
+    if txt.split()[0].lower() in incomplete_starters and len(txt.split()) < 6:
+        return "CONTINUE"
+    
+    # Check for prepositions at the end which usually indicate incompleteness
+    ending_prepositions = ["in", "on", "at", "to", "with", "for", "about", "from", "by", "of"]
+    if txt.split()[-1].lower() in ending_prepositions:
+        return "CONTINUE"
+    
+    # Default to complete for longer phrases without other indicators
     return "COMPLETE"
 
-# Lazy ML loader
+# Configure PyTorch before importing
 def load_model():
     global model, complete_embeds, incomplete_embeds, ml_ready
     try:
+        # Import and configure torch first, before any other imports
         import torch
+        # Set threading options before any parallel work happens
         torch.set_num_threads(1)
-        torch.set_num_interop_threads(1)
+        
+        # Now import the rest
         from sentence_transformers import SentenceTransformer
         from sklearn.metrics.pairwise import cosine_similarity
         import numpy as np
@@ -96,9 +132,16 @@ def ml_based(text):
         sim_c = max(cosine_similarity(input_vec, complete_embeds)[0])
         sim_i = max(cosine_similarity(input_vec, incomplete_embeds)[0])
 
-        if sim_c > 0.40 and sim_c > sim_i:
+        # Debug output
+        print(json.dumps({
+            "type": "debug", 
+            "message": f"Sentence detection scores: complete={sim_c:.4f}, incomplete={sim_i:.4f}, text='{text}'"
+        }), flush=True)
+
+        # Adjust thresholds and logic
+        if sim_c > 0.45 and sim_c > sim_i + 0.05:
             return "COMPLETE"
-        elif sim_i > sim_c:
+        elif sim_i > sim_c or len(text.split()) < 5:
             return "CONTINUE"
         else:
             return rule_based(text)
