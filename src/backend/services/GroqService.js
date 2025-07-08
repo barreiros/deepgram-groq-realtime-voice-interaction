@@ -4,7 +4,7 @@ import {
   MessagesPlaceholder,
 } from '@langchain/core/prompts'
 import { StringOutputParser } from '@langchain/core/output_parsers'
-import { ConversationSummaryBufferMemory } from 'langchain/memory'
+import { ConversationSummaryBufferMemory, BufferWindowMemory } from 'langchain/memory'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import SentenceCompletion from '../tools/SentenceCompletion.js'
 import Groq from 'groq-sdk'
@@ -41,10 +41,24 @@ class GroqService {
 
     this.imageModel = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
+    // Create a more aggressive memory management system
     this.memory = new ConversationSummaryBufferMemory({
       llm: this.memoryModel,
-      maxTokenLimit: 1000,
+      maxTokenLimit: 500, // Reduced token limit for more frequent summarization
       returnMessages: true,
+      memoryKey: "chat_history",
+      inputKey: "input",
+      outputKey: "output",
+      summarizeEveryN: 2, // Summarize more frequently
+    })
+    
+    // Create a backup window memory for the most recent interactions
+    this.recentMemory = new BufferWindowMemory({
+      k: 3, // Keep only the 3 most recent exchanges
+      returnMessages: true,
+      memoryKey: "recent_history",
+      inputKey: "input",
+      outputKey: "output",
     })
 
     this.sentenceDetector = sentenceDetector
@@ -111,10 +125,17 @@ class GroqService {
             language: this.language,
           })
 
-          await this.memory.saveContext(
-            { input: completeSentence },
-            { output: response }
-          )
+          // Save to both memory systems
+          await Promise.all([
+            this.memory.saveContext(
+              { input: completeSentence },
+              { output: response }
+            ),
+            this.recentMemory.saveContext(
+              { input: completeSentence },
+              { output: response }
+            )
+          ])
         }
       } catch (error) {
         console.error('Error processing inactive buffer:', error)
@@ -170,10 +191,17 @@ class GroqService {
               text: response.trim(),
               language: this.language,
             })
-            await this.memory.saveContext(
-              { input: completeSentence },
-              { output: response }
-            )
+            // Save to both memory systems
+            await Promise.all([
+              this.memory.saveContext(
+                { input: completeSentence },
+                { output: response }
+              ),
+              this.recentMemory.saveContext(
+                { input: completeSentence },
+                { output: response }
+              )
+            ])
           }
         } catch (error) {
           console.error('Error processing complete utterance:', error)
@@ -189,13 +217,39 @@ class GroqService {
   }
 
   async prepareChatResponse() {
-    const chatHistory = await this.memory.loadMemoryVariables({})
+    // Load both memory types
+    const [mainMemory, recentMemory] = await Promise.all([
+      this.memory.loadMemoryVariables({}),
+      this.recentMemory.loadMemoryVariables({})
+    ])
+    
     const effectiveSystemMessage = this.getEffectiveSystemMessage()
-
+    
+    // Combine memories, prioritizing recent interactions
+    const combinedHistory = [
+      ...(mainMemory.history || []),
+      ...(recentMemory.recent_history || [])
+    ]
+    
+    // Remove duplicates that might exist in both memories
+    const uniqueMessages = this.deduplicateMessages(combinedHistory)
+    
     return this.conversationChain.invoke({
       input: this.transcriptionBuffer,
       system_message: effectiveSystemMessage,
-      chat_history: chatHistory.history || [],
+      chat_history: uniqueMessages,
+    })
+  }
+  
+  // Helper method to remove duplicate messages from combined memory
+  deduplicateMessages(messages) {
+    const seen = new Set()
+    return messages.filter(msg => {
+      // Create a unique key based on message content
+      const key = msg.type + ":" + (msg.content || msg.text || "")
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
     })
   }
 
@@ -307,16 +361,31 @@ class GroqService {
       const combinedDescriptions = imageDescriptions.join('\n\n')
 
       console.log(`Saving context for ${imageDescriptions.length} images`)
-      await this.memory.saveContext(
-        {
-          input: `${userQuery} [Images content: ${combinedDescriptions}]`,
-        },
-        {
-          output: `I can see the ${imagesData.length} ${
-            imagesData.length === 1 ? 'image' : 'images'
-          } you shared. ${combinedDescriptions}`,
-        }
-      )
+      
+      // Create a more concise summary for image descriptions
+      const outputSummary = `I analyzed ${imagesData.length} ${
+        imagesData.length === 1 ? 'image' : 'images'
+      } showing: ${imageDescriptions.map(desc => desc.split(':')[1].trim().substring(0, 50) + '...').join('; ')}`;
+      
+      // Save to both memory systems with optimized content
+      await Promise.all([
+        this.memory.saveContext(
+          {
+            input: `${userQuery} [Images shared: ${imagesData.length}]`,
+          },
+          {
+            output: outputSummary,
+          }
+        ),
+        this.recentMemory.saveContext(
+          {
+            input: `${userQuery} [Images content: ${combinedDescriptions.substring(0, 200)}...]`,
+          },
+          {
+            output: outputSummary,
+          }
+        )
+      ])
     } catch (error) {
       console.error('Error processing images message:', error)
       this.eventEmitter.emit('error', { error: error.message })
@@ -339,7 +408,11 @@ class GroqService {
           language: this.language,
         })
 
-        await this.memory.saveContext({ input: text }, { output: response })
+        // Save to both memory systems
+        await Promise.all([
+          this.memory.saveContext({ input: text }, { output: response }),
+          this.recentMemory.saveContext({ input: text }, { output: response })
+        ])
       }
     } catch (error) {
       console.error('Error processing text message:', error)
@@ -347,10 +420,49 @@ class GroqService {
     }
   }
 
+  // Add method to compress memory on demand
+  async compressMemory() {
+    try {
+      // Force summarization of the current memory
+      const currentMemory = await this.memory.loadMemoryVariables({})
+      if (currentMemory.history && currentMemory.history.length > 3) {
+        const summarizationPrompt = `Summarize this conversation history very concisely in 2-3 sentences, focusing only on the most important points:\n\n${
+          currentMemory.history.map(msg => 
+            `${msg.type === 'human' ? 'User' : 'AI'}: ${msg.content || msg.text}`
+          ).join('\n')
+        }`
+        
+        const summary = await this.memoryModel.invoke(summarizationPrompt)
+        
+        // Reset memory and store only the summary
+        this.memory = new ConversationSummaryBufferMemory({
+          llm: this.memoryModel,
+          maxTokenLimit: 500,
+          returnMessages: true,
+          memoryKey: "chat_history",
+        })
+        
+        // Add the summary as an AI message
+        await this.memory.saveContext(
+          { input: "Summarize our conversation so far." },
+          { output: summary }
+        )
+        
+        console.log("Memory compressed successfully")
+      }
+    } catch (error) {
+      console.error("Error compressing memory:", error)
+    }
+  }
+
   close() {
     if (this.sentenceDetector) {
       this.sentenceDetector.removeConnection()
     }
+    
+    // Clear memory references
+    this.memory = null
+    this.recentMemory = null
   }
 }
 
