@@ -36,7 +36,7 @@ from sentence_transformers import SentenceTransformer; \
 SentenceTransformer('paraphrase-MiniLM-L12-v2', device='cpu', cache_folder='/app/huggingface')"
 
 # Install Node dependencies (production only)
-RUN npm ci --omit=dev
+RUN npm install
 
 # Copy the entire app
 COPY . .
