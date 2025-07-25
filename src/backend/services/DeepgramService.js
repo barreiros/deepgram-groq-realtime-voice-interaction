@@ -31,7 +31,7 @@ export class DeepgramService {
       smart_format: true,
       sample_rate: this.params?.listen_sample_rate
         ? parseInt(this.params.listen_sample_rate)
-        : 16000,
+        : 24000,
       channels: this.params?.listen_channels
         ? parseInt(this.params.listen_channels)
         : 1,

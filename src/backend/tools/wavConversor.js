@@ -8,7 +8,7 @@ import fs from 'fs'
  */
 export function writeWavFile(pcmBuffer, filePath, options = {}) {
   const numChannels = options.numChannels || 1
-  const sampleRate = options.sampleRate || 16000
+  const sampleRate = options.sampleRate || 24000
   const bitDepth = options.bitDepth || 16
 
   const byteRate = (sampleRate * numChannels * bitDepth) / 8

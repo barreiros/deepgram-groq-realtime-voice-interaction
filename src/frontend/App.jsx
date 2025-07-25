@@ -255,7 +255,7 @@ export default function App() {
     console.log('Adding images:', imageFiles.length)
     console.log('Current selectedImages:', selectedImages.length)
 
-    setSelectedImages(prev => {
+    setSelectedImages((prev) => {
       const newImages = [...prev, ...imageFiles]
       console.log('New selectedImages array:', newImages.length)
       return newImages
@@ -303,7 +303,10 @@ export default function App() {
           const reader = new FileReader()
           reader.onload = () => {
             const base64Data = reader.result.split(',')[1]
-            console.log(`Image ${index + 1} converted to base64, size:`, base64Data.length)
+            console.log(
+              `Image ${index + 1} converted to base64, size:`,
+              base64Data.length
+            )
             resolve({
               data: base64Data,
               type: file.type,
@@ -315,7 +318,10 @@ export default function App() {
       })
 
       const imageDataArray = await Promise.all(imagePromises)
-      console.log('All images processed, final array length:', imageDataArray.length)
+      console.log(
+        'All images processed, final array length:',
+        imageDataArray.length
+      )
       messageData.images = imageDataArray
 
       console.log('Sending message with images:', messageData.images.length)
